@@ -25,6 +25,7 @@ st.markdown("""
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
     .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
     .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; font-size: 14px; color: #cbd5e1; }
+    .roi-box { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; margin-top: 15px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -137,7 +138,6 @@ if not st.session_state['logged_in']:
             else:
                 st.error("❌ Credenziali errate.")
     
-    # SEZIONE VANTAGGI TECNICI AGGIORNATI PER LE AZIENDE
     st.markdown("<br><hr style='border-color: #1e3a8a;'><br>", unsafe_allow_html=True)
     
     col_v1, col_v2, col_v3 = st.columns(3)
@@ -167,12 +167,12 @@ else:
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
-    # --- VISUALE SUPER ADMIN (DASHBOARD CRM) ---
+    # --- VISUALE SUPER ADMIN (DASHBOARD CRM + SIMULATORE ROI) ---
     if st.session_state.get('is_admin'):
         col1, col2 = st.columns([5, 1])
         with col1:
-            st.title("Pannello di Controllo Direzionale")
-            st.write("Gestisci i tuoi clienti e le licenze attive in tempo reale.")
+            st.title("Pannello di Controllo Direzionale & Simulatore ROI")
+            st.write("Gestisci le licenze dei clienti e calcola il valore di vendita in tempo reale.")
         with col2:
             if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
@@ -182,6 +182,36 @@ else:
         
         st.markdown("---")
         
+        # 📊 CALCOLATORE DI ROI E PREZZO (STRUMENTO DI VENDITA)
+        with st.expander("💼 Simulatore di Prezzo e ROI per Trattativa Commerciale", expanded=False):
+            st.write("Usa questo calcolatore durante una chiamata con un cliente per dimostrargli il ritorno economico dell'investimento.")
+            
+            c_r1, c_r2 = st.columns(2)
+            with c_r1:
+                ore_video_mese = st.number_input("Ore di video ispezione analizzate al mese dall'azienda:", min_value=1, max_value=500, value=20)
+            with c_r2:
+                costo_orario_tecnico = st.number_input("Costo orario stimato del tecnico (stipendio + oneri):", min_value=15, max_value=100, value=35)
+            
+            # Calcoli di stima
+            ore_risparmiate_per_ora_video = 2.5 # Il software fa in 3 min ciò che richiede ore
+            totale_ore_risparmiate = ore_video_mese * ore_risparmiate_per_ora_video
+            risparmio_economico_mensile = totale_ore_risparmiate * costo_orario_tecnico
+            
+            # Prezzo suggerito del software (circa il 25-30% del valore del risparmio)
+            prezzo_consigliato = max(290, round(risparmio_economico_mensile * 0.3, -1))
+            
+            st.markdown(f"""
+            <div class="roi-box">
+                <h4 style="color: #10b981; margin-top: 0;">📈 Risultati della Simulazione per il Cliente</h4>
+                <p>🕒 Ore di lavoro umano risparmiate al mese: <b>{totale_ore_risparmiate:.1f} ore</b></p>
+                <p>💸 Costo attuale del lavoro manuale sprecato: <b>{risparmio_economico_mensile:,.2f} € / mese</b></p>
+                <hr style="border-color: #10b981; opacity: 0.3;">
+                <p style="font-size: 16px; margin-bottom: 0;">💡 <b>Prezzo di vendita consigliato (Abbonamento Mensile):</b> <span style="color: #38bdf8; font-size: 20px;"><b>{prezzo_consigliato:,.0f} € / mese</b></span></p>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         with st.expander("➕ Aggiungi Nuovo Cliente e Licenza", expanded=False):
             st.session_state['input_cliente'] = st.text_input("Nome Cliente / Azienda", value=st.session_state['input_cliente'])
             
@@ -335,7 +365,6 @@ else:
                     tmp_file.write(uploaded_file.read())
                     tmp_file_path = tmp_file.name
                 
-                # Calcolo impronta Hash forense del file video
                 st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                 
                 with st.spinner("Caricamento in corso..."):
@@ -369,7 +398,6 @@ else:
                 doc = SimpleDocTemplate(pdf_filename, pagesize=letter)
                 styles = getSampleStyleSheet()
                 
-                # Stile personalizzato per l'intestazione forense
                 style_forense = ParagraphStyle(
                     'ForenseStyle',
                     parent=styles['Normal'],
