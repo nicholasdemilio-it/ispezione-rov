@@ -3,6 +3,8 @@ import google.generativeai as genai
 import tempfile
 import os
 import time
+import random
+import string
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -19,7 +21,6 @@ st.markdown("""
     .stAlert { background-color: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a; color: #e2e8f0; }
     .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
-    .admin-card { background-color: rgba(15, 23, 42, 0.8); padding: 15px; border-radius: 10px; border: 1px solid #1e3a8a; margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -39,9 +40,16 @@ if 'is_admin' not in st.session_state:
     st.session_state['is_admin'] = False
 if 'do_login' not in st.session_state:
     st.session_state['do_login'] = False
+if 'codice_generato' not in st.session_state:
+    st.session_state['codice_generato'] = ""
 
 def trigger_login():
     st.session_state['do_login'] = True
+
+def genera_codice():
+    p1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    p2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    st.session_state['codice_generato'] = f"LIC-{p1}-{p2}"
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -129,7 +137,7 @@ else:
     if st.session_state.get('is_admin'):
         col1, col2 = st.columns([5, 1])
         with col1:
-            st.title("⚙️ Pannello di Controllo Direzionale")
+            st.title("Pannello di Controllo Direzionale")
             st.write("Gestisci i tuoi clienti e le licenze attive in tempo reale.")
         with col2:
             if st.button("Esci (Logout)"):
@@ -141,29 +149,35 @@ else:
         
         # 1. Modulo Creazione Nuova Licenza
         with st.expander("➕ Aggiungi Nuovo Cliente e Licenza", expanded=False):
-            with st.form("nuova_licenza_form", clear_on_submit=True):
-                col_f1, col_f2 = st.columns(2)
-                with col_f1:
-                    nuovo_cliente = st.text_input("Nome Cliente / Azienda")
-                with col_f2:
-                    nuova_licenza = st.text_input("Codice Licenza (es. LIC-MILANO-001)")
-                
-                btn_crea = st.form_submit_button("Genera Licenza")
-                if btn_crea:
-                    if nuovo_cliente and nuova_licenza:
-                        try:
-                            supabase.table("licenze").insert({"cliente": nuovo_cliente, "codice_licenza": nuova_licenza, "attiva": True}).execute()
-                            st.success(f"✅ Licenza per {nuovo_cliente} creata con successo!")
-                            time.sleep(1.5)
-                            st.rerun()
-                        except Exception as e:
-                            st.error("Errore: Impossibile creare la licenza. Verifica che il codice non esista già.")
-                    else:
-                        st.warning("⚠️ Compila entrambi i campi.")
+            col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
+            with col_f1:
+                nuovo_cliente = st.text_input("Nome Cliente / Azienda")
+            with col_f2:
+                nuova_licenza = st.text_input("Codice Licenza", value=st.session_state['codice_generato'])
+            with col_f3:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("Genera", use_container_width=True):
+                    genera_codice()
+                    st.rerun()
+            
+            btn_crea = st.button("✅ Salva Nuova Licenza", use_container_width=True)
+            if btn_crea:
+                if nuovo_cliente and nuova_licenza:
+                    try:
+                        supabase.table("licenze").insert({"cliente": nuovo_cliente, "codice_licenza": nuova_licenza, "attiva": True}).execute()
+                        st.success(f"✅ Licenza per {nuovo_cliente} creata con successo!")
+                        st.session_state['codice_generato'] = "" 
+                        time.sleep(1.5)
+                        st.rerun()
+                    except Exception as e:
+                        st.error("Errore: Impossibile creare la licenza. Verifica che il codice non esista già.")
+                else:
+                    st.warning("⚠️ Compila entrambi i campi prima di salvare.")
 
-        st.subheader("👥 Database Clienti")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.subheader("Database Clienti")
         
-        # 2. Tabella Lettura e Gestione Licenze
+        # 2. Tabella Lettura e Gestione Licenze (Stile Zebra)
         try:
             risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
             dati_licenze = risposta.data
@@ -171,35 +185,39 @@ else:
             if not dati_licenze:
                 st.info("Nessuna licenza presente nel database.")
             else:
-                # Intestazioni della tabella
-                col_h1, col_h2, col_h3, col_h4 = st.columns([2, 2, 1, 1])
-                with col_h1: st.markdown("**🏢 Cliente**")
-                with col_h2: st.markdown("**🔑 Codice Licenza**")
-                with col_h3: st.markdown("**Stato**")
-                with col_h4: st.markdown("**Azione**")
+                # Intestazione invisibile e allineata
+                st.markdown("""
+                <div style="display: flex; justify-content: space-between; padding: 0px 15px; margin-bottom: 10px; color: #94a3b8; font-weight: bold; font-size: 14px;">
+                    <span style="width: 35%;">🏢 Cliente</span>
+                    <span style="width: 35%;">🔑 Codice Licenza</span>
+                    <span style="width: 30%;">Stato</span>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                # Generazione dinamica delle righe
-                for riga in dati_licenze:
-                    st.markdown("<div class='admin-card'>", unsafe_allow_html=True)
-                    c_cli, c_lic, c_stat, c_act = st.columns([2, 2, 1, 1])
+                for i, riga in enumerate(dati_licenze):
+                    # Calcolo sfondo alternato (Zebra striping)
+                    bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
                     
-                    with c_cli:
-                        st.markdown(f"**{riga['cliente']}**")
-                    with c_lic:
-                        st.code(riga['codice_licenza'])
-                    with c_stat:
-                        if riga['attiva']:
-                            st.success("🟢 Attivo")
-                        else:
-                            st.error("🔴 Sospeso")
+                    c_info, c_act = st.columns([4.5, 1])
+                    
+                    with c_info:
+                        stato_visivo = "🟢 <span style='color: #10b981;'>Attivo</span>" if riga['attiva'] else "🔴 <span style='color: #ef4444;'>Sospeso</span>"
+                        
+                        st.markdown(f"""
+                        <div style="background-color: {bg_color}; padding: 14px 15px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between; align-items: center; height: 100%;">
+                            <span style="font-weight: bold; font-size: 16px; width: 35%; color: #f8fafc;">{riga['cliente']}</span>
+                            <span style="font-family: monospace; color: #38bdf8; width: 35%; font-size: 15px;">{riga['codice_licenza']}</span>
+                            <span style="width: 30%; font-weight: bold;">{stato_visivo}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
                     with c_act:
-                        # Bottone per invertire lo stato
+                        st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
                         etichetta_bottone = "Sospendi" if riga['attiva'] else "Riattiva"
-                        if st.button(etichetta_bottone, key=f"btn_{riga['codice_licenza']}"):
+                        if st.button(etichetta_bottone, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
                             nuovo_stato = not riga['attiva']
                             supabase.table("licenze").update({"attiva": nuovo_stato}).eq("codice_licenza", riga['codice_licenza']).execute()
-                            st.rerun() # Ricarica istantaneamente la pagina per mostrare la modifica
-                    st.markdown("</div>", unsafe_allow_html=True)
+                            st.rerun()
         except Exception as e:
             st.error("Errore di connessione a Supabase durante il caricamento dei clienti.")
                 
