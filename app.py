@@ -71,7 +71,7 @@ if not st.session_state['logged_in']:
                 st.rerun()
             else:
                 st.error("❌ Credenziali errate. Riprova.")
-else:
+            else:
     # --- L'APP VERA E PROPRIA ---
     
     # LA TUA CHIAVE API FISSA E NASCOSTA
