@@ -6,6 +6,8 @@ import time
 import random
 import string
 import hashlib
+import re
+from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -67,6 +69,16 @@ def calcola_hash_file(file_path):
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
+
+def pulisci_testo_ia(testo_grezzo):
+    """Rimuove simboli grezzi e markdown non professionale trasformandoli in formattazione pulita."""
+    testo = re.sub(r'#{1,6}\s*', '', testo_grezzo)
+    testo = re.sub(r'\*\*(.*?)\*\*', r'\1', testo)
+    testo = re.sub(r'\*(.*?)\*', r'\1', testo)
+    testo = re.sub(r'__(.*?)__', r'\1', testo)
+    testo = re.sub(r'`(.*?)`', r'\1', testo)
+    testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
+    return testo.strip()
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -171,8 +183,8 @@ else:
     if st.session_state.get('is_admin'):
         col1, col2 = st.columns([5, 1])
         with col1:
-            st.title("Pannello di Controllo Direzionale & Simulatore ROI")
-            st.write("Gestisci le licenze dei clienti e calcola il valore di vendita in tempo reale.")
+            st.title("Pannello di Controllo Direzionale & Vendite")
+            st.write("Gestisci le licenze, calcola il ROI e genera i moduli d'ordine per i clienti.")
         with col2:
             if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
@@ -182,6 +194,52 @@ else:
         
         st.markdown("---")
         
+        with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B (Per la Vendita)", expanded=False):
+            st.write("Compila i dati dell'azienda acquirente per generare istantaneamente il contratto PDF da inviare via email.")
+            
+            c_ord1, c_ord2 = st.columns(2)
+            with c_ord1:
+                cli_nome = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl")
+                cli_piva = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890")
+                cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
+            with c_ord2:
+                tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone mensile agevolato)", "Abbonamento Mensile Flessibile (Senza vincoli)"))
+                prezzo_proposta = st.number_input("Canone Concordato (€ / mese + IVA)", min_value=100, max_value=5000, value=390)
+                report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
+            
+            if st.button("📥 Genera PDF Modulo d'Ordine B2B", use_container_width=True):
+                if cli_nome and cli_piva:
+                    ordine_filename = f"Modulo_Ordine_HydroAegis_{cli_nome.replace(' ', '_')}.pdf"
+                    doc_ord = SimpleDocTemplate(ordine_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+                    styles_ord = getSampleStyleSheet()
+                    
+                    style_titolo_ord = ParagraphStyle('TitleOrd', parent=styles_ord['Heading1'], fontSize=15, leading=18, spaceAfter=10, textColor=colors.HexColor("#0b1a30"))
+                    style_testo_ord = ParagraphStyle('TextOrd', parent=styles_ord['Normal'], fontSize=10, leading=14, spaceAfter=8, textColor=colors.HexColor("#1e293b"))
+                    
+                    story_ord = [
+                        Paragraph("<b>MODULO D'ORDINE E PROPOSTA DI ABBONAMENTO SaaS</b>", style_titolo_ord),
+                        Paragraph("<b>HydroAegis AI – Piattaforma di Ispezione Automatica e Certificazione Forense</b>", style_testo_ord),
+                        Spacer(1, 10),
+                        Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome}<br/>• P.IVA / C.F.: {cli_piva}<br/>• Email Referente: {cli_email}", style_testo_ord),
+                        Spacer(1, 6),
+                        Paragraph(f"<b>2. SELEZIONE DEL PIANO:</b><br/>• Formula Commerciale: {tipo_piano}<br/>• Canone: <b>€ {prezzo_proposta} / mese + IVA</b><br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.", style_testo_ord),
+                        Spacer(1, 6),
+                        Paragraph("<b>3. NOTE LEGALI E LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce uno strumento di supporto decisionale basato su IA. La validazione tecnica definitiva, la conformità alla norma EN 13508-2 e la responsabilità della firma del report rimangono a totale ed esclusivo carico del tecnico abilitato dell'azienda committente.", style_testo_ord),
+                        Spacer(1, 6),
+                        Paragraph("<b>4. PROPRIETÀ INTELLETTUALE E DATI:</b><br/>Il Committente mantiene la piena titolarità dei file caricati. Il Fornitore garantisce l'assenza di memorizzazione permanente o utilizzo dei dati per addestramento di IA pubbliche.", style_testo_ord),
+                        Spacer(1, 20),
+                        Paragraph("<b>Luogo e Data:</b> ___________________________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Firma e Timbro per Accettazione:</b> ___________________________", style_testo_ord)
+                    ]
+                    doc_ord.build(story_ord)
+                    
+                    with open(ordine_filename, "rb") as f_ord:
+                        st.download_button("⬇️ SCARICA IL MODULO D'ORDINE COMPILATO", data=f_ord, file_name=ordine_filename, mime="application/pdf")
+                    st.success("✅ Modulo d'Ordine generato con successo!")
+                else:
+                    st.warning("⚠️ Inserisci almeno la Ragione Sociale e la Partita IVA dell'azienda.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
         with st.expander("💼 Simulatore di Prezzo e ROI per Trattativa Commerciale", expanded=False):
             st.write("Usa questo calcolatore durante una chiamata con un cliente per dimostrargli il ritorno economico dell'investimento.")
             
@@ -351,15 +409,12 @@ else:
 
         tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"))
         
-        # Formati consentiti (Video e Audio multimediali supportati dall'API Gemini)
         formati_accettati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
-        
         uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati_accettati)
 
         if uploaded_file is not None:
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
             
-            # Blocco preventivo se provano a caricare un PDF o documenti non supportati
             if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']:
                 st.error("🚫 I documenti testuali (PDF, Word, Excel) non possono essere elaborati dal motore video. Carica un file video (es. MP4, MOV) o audio dell'ispezione.")
             else:
@@ -372,14 +427,14 @@ else:
                     st.error(f"🚫 Hai esaurito i report disponibili per questo mese ({report_fatti}/{limite_totale}). Contatta l'amministratore per effettuare l'upgrade del piano o rinnovare i crediti.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🚀 Avvia Analisi con Doppia Verifica", use_container_width=True):
+                    if st.button("Avvia Analisi con Doppia Verifica", use_container_width=True):
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        with st.spinner("Caricamento del flusso video in corso..."):
+                        with st.spinner("Caricamento del flusso multimediale in corso..."):
                             media_file = genai.upload_file(path=tmp_file_path)
                             while media_file.state.name == "PROCESSING":
                                 time.sleep(3)
@@ -387,21 +442,157 @@ else:
                         
                         model = genai.GenerativeModel(model_name="gemini-3.6-flash")
                         
-                        with st.spinner("Fase 1/2: Scansione IA in corso..."):
-                            ruolo = "Sei un Ispettore Offshore. Trova le anomalie nel file ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un tecnico fognario. Trova le anomalie nella tubazione."
-                            bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie con il minuto esatto."]).text
+                        with st.spinner("Fase 1/2: Scansione strutturale primaria..."):
+                            ruolo = "Sei un Ispettore Tecnico Offshore. Analizza il filmato ROV e identifica le anomalie con timestamp esatto." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Analizza l'ispezione e rileva tutte le anomalie strutturali con timestamp."
+                            bozza = model.generate_content([media_file, f"{ruolo}\nFornisci l'elenco preliminare delle anomalie."]).text
 
-                        with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI)..."):
-                            prompt_2 = f"""Sei un Supervisore QA esperto di ingegneria civile/offshore. Bozza: {bozza}
-                            1. Scarta i falsi positivi.
-                            2. Applica rigorosamente i codici EN 13508-2.
-                            3. Assegna una Classe di Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza Strutturale / Classe 2 - Manutenzione Programmata / Classe 3 - Monitoraggio).
-                            4. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
-                            5. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
-                            st.session_state['report_text'] = model.generate_content([media_file, prompt_2]).text
+                        with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI & Standard EN 13508-2)..."):
+                            prompt_2 = f"""Sei un Supervisore Tecnico QA per certificazioni infrastrutturali. 
+                            Analizza la bozza seguente:
+                            {bozza}
+                            
+                            Istruzioni di redazione formale:
+                            1. Filtra ed elimina ogni falso positivo.
+                            2. Assegna a ogni difetto il codice normativo EN 13508-2 pertinente.
+                            3. Calcola l'Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza Strutturale / Classe 2 - Manutenzione Programmata / Classe 3 - Monitoraggio).
+                            4. Struttura chiaramente le sezioni:
+                               - RILEVAZIONE ANOMALIE E CODIFICA NORMATIVA
+                               - CLASSIFICAZIONE PRIORITÀ D'INTERVENTO (IQI)
+                               - VALUTAZIONE STRUTTURALE GENERALE E CONCLUSIONI
+                            5. NON USARE ASTERISCHI, NON USARE CANCELLETTI (#), NON USARE MARKDOWN GREZZO. Usa un linguaggio ingegneristico, formale, schematico e pronto per atti peritali."""
+                            
+                            testo_generato = model.generate_content([media_file, prompt_2]).text
+                            st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
                             os.remove(tmp_file_path)
 
-        # --- ISTRUZIONI E PRIVACY SPOSTATE SOTTO IL TASTO DI AVVIO ---
+        # --- CONFERMA DI COMPLETAMENTO SOPRA LE ISTRUZIONI ---
+        if 'report_text' in st.session_state:
+            st.success("✅ Doppia verifica completata con successo e classificazione IQI inclusa!")
+            testo_revisionato = st.text_area("Bozza Certificata (Modificabile)", value=st.session_state['report_text'], height=400)
+            
+            if st.button("Genera PDF Definitivo con Impronta Forense"):
+                try:
+                    nuovo_consumo = report_fatti + 1
+                    supabase.table("licenze").update({"report_consumati": nuovo_consumo}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
+                except:
+                    pass
+
+                pdf_filename = "Report_Ispezione_Certificato.pdf"
+                doc = SimpleDocTemplate(
+                    pdf_filename, 
+                    pagesize=letter,
+                    rightMargin=36,
+                    leftMargin=36,
+                    topMargin=36,
+                    bottomMargin=36
+                )
+                styles = getSampleStyleSheet()
+                
+                # Stili tipografici istituzionali
+                style_header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=16, textColor=colors.HexColor("#0f172a"))
+                style_header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=11, textColor=colors.HexColor("#475569"))
+                style_meta = ParagraphStyle('MetaText', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor("#1e293b"))
+                style_hash = ParagraphStyle('HashText', parent=styles['Normal'], fontName='Courier', fontSize=7.5, leading=9, textColor=colors.HexColor("#0284c7"))
+                style_section_heading = ParagraphStyle('SecHeading', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor("#0f2942"), spaceBefore=10, spaceAfter=4)
+                style_body = ParagraphStyle('Body', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor("#1e293b"))
+                style_bullet = ParagraphStyle('Bullet', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=13, leftIndent=12, firstLineIndent=-10, textColor=colors.HexColor("#1e293b"))
+                style_legal = ParagraphStyle('LegalNotice', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=colors.HexColor("#64748b"))
+
+                story = []
+
+                # Intestazione Documentale a Tabella
+                data_odierna = datetime.now().strftime("%d/%m/%Y - %H:%M")
+                header_data = [
+                    [
+                        Paragraph("<b>HYDROAEGIS AI | RAPPORTO TECNICO CERTIFICATO</b>", style_header_title),
+                        Paragraph(f"<b>Data Emissione:</b> {data_odierna}", style_meta)
+                    ],
+                    [
+                        Paragraph("<b>Standard di Riferimento:</b> EN 13508-2 | Protocollo Dual-Core QA", style_header_sub),
+                        Paragraph(f"<b>Ambiente:</b> {tipo_ispezione}", style_meta)
+                    ],
+                    [
+                        Paragraph(f"<b>Committente:</b> {cliente}", style_meta),
+                        Paragraph("<b>Stato Procedura:</b> Convalidato", style_meta)
+                    ]
+                ]
+                
+                table_header = Table(header_data, colWidths=[340, 200])
+                table_header.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                    ('BOX', (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e1")),
+                    ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ]))
+                story.append(table_header)
+                story.append(Spacer(1, 10))
+
+                # Box Impronta Forense SHA-256
+                hash_val = st.session_state.get('file_hash', 'N/D')
+                hash_box_data = [[
+                    Paragraph("<b>CATENA DI CUSTODIA FORENSE & IMPRONTA DIGITALE DEL FLUSSO VIDEO ORIGINALE</b>", ParagraphStyle('HBoxTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor("#0f172a"))),
+                ], [
+                    Paragraph(f"SHA-256 HASH: {hash_val}", style_hash)
+                ]]
+                table_hash = Table(hash_box_data, colWidths=[540])
+                table_hash.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f0f9ff")),
+                    ('BOX', (0, 0), (-1, -1), 0.8, colors.HexColor("#bae6fd")),
+                    ('TOPPADDING', (0, 0), (-1, -1), 4),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ]))
+                story.append(table_hash)
+                story.append(Spacer(1, 12))
+
+                # Elaborazione Corpo del Testo (Senza Asterischi o Simboli Grezzi)
+                testo_pulito = pulisci_testo_ia(testo_revisionato)
+                righe = testo_pulito.split('\n')
+
+                for riga in righe:
+                    riga_strip = riga.strip()
+                    if not riga_strip:
+                        story.append(Spacer(1, 4))
+                        continue
+
+                    # Identificazione Intestazioni di Sezione Principali
+                    if riga_strip.isupper() and len(riga_strip) > 4:
+                        story.append(Paragraph(riga_strip, style_section_heading))
+                        story.append(Spacer(1, 3))
+                    elif riga_strip.startswith(('1.', '2.', '3.', '4.', '5.', 'SEZIONE', 'FASE')):
+                        story.append(Paragraph(f"<b>{riga_strip}</b>", style_section_heading))
+                        story.append(Spacer(1, 3))
+                    elif riga_strip.startswith(('•', '-')):
+                        testo_elenco = riga_strip.lstrip('•- ').strip()
+                        story.append(Paragraph(f"• {testo_elenco}", style_bullet))
+                    else:
+                        story.append(Paragraph(riga_strip, style_body))
+
+                # Note Legali e Limitazione di Responsabilità (Human-in-the-Loop)
+                story.append(Spacer(1, 16))
+                legal_box_data = [[
+                    Paragraph("<b>NOTE LEGALI & LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b> Il presente documento è elaborato mediante ausilio di sistemi algoritmici automatici (HydroAegis AI) a fini di supporto decisionale. La validazione peritale definitiva, la congruità normativa rispetto agli standard tecnici e la sottoscrizione formale del fascicolo rimangono a totale ed esclusivo carico del tecnico abilitato dell'azienda committente.", style_legal)
+                ]]
+                table_legal = Table(legal_box_data, colWidths=[540])
+                table_legal.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                    ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 8),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+                ]))
+                story.append(table_legal)
+
+                doc.build(story)
+                with open(pdf_filename, "rb") as pdf_file:
+                    st.download_button("📥 SCARICA IL REPORT PDF CERTIFICATO", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
+
+        # --- ISTRUZIONI E PRIVACY SOTTO LA CONFERMA ---
         st.markdown("""
         <div class="privacy-box">
             <h4 style="color: #38bdf8; margin-top: 0;">📌 Istruzioni operative e Garanzia di Privacy</h4>
@@ -416,56 +607,3 @@ else:
             </p>
         </div>
         """, unsafe_allow_html=True)
-
-        if 'report_text' in st.session_state:
-            st.success("✅ Doppia verifica completata con successo e classificazione IQI inclusa!")
-            testo_revisionato = st.text_area("Bozza Certificata", value=st.session_state['report_text'], height=400)
-            
-            if st.button("Genera PDF Definitivo con Impronta Forense"):
-                try:
-                    nuovo_consumo = report_fatti + 1
-                    supabase.table("licenze").update({"report_consumati": nuovo_consumo}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
-                except:
-                    pass
-
-                pdf_filename = "Report_Ispezione_Certificato.pdf"
-                doc = SimpleDocTemplate(pdf_filename, pagesize=letter)
-                styles = getSampleStyleSheet()
-                
-                style_forense = ParagraphStyle(
-                    'ForenseStyle',
-                    parent=styles['Normal'],
-                    fontSize=9,
-                    leading=11,
-                    textColor=colors.HexColor("#475569")
-                )
-                
-                style_legal = ParagraphStyle(
-                    'LegalStyle',
-                    parent=styles['Normal'],
-                    fontSize=8,
-                    leading=10,
-                    textColor=colors.HexColor("#64748b")
-                )
-                
-                story = [
-                    Paragraph(f"<b>RAPPORTO TECNICO CERTIFICATO - {tipo_ispezione.upper()}</b>", ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, spaceAfter=10)),
-                    Paragraph("<b>Normativa di Riferimento:</b> EN 13508-2 | Protocollo Dual-Core IA", styles['Normal']),
-                    Spacer(1, 10),
-                    Paragraph(f"<b>Azienda Committente:</b> {cliente}", styles['Normal']),
-                    Paragraph(f"<b>Impronta Digitale Video (SHA-256):</b> <font name='Courier'>{st.session_state.get('file_hash', 'N/D')}</font>", style_forense),
-                    Spacer(1, 15)
-                ]
-                
-                for line in testo_revisionato.split('\n'):
-                    if line.strip():
-                        story.extend([Paragraph(line, styles['Normal']), Spacer(1, 6)])
-                
-                story.extend([
-                    Spacer(1, 20),
-                    Paragraph("<b>NOTE LEGALI E LIMITAZIONE DI RESPONSABILITÀ:</b> Il presente report è generato mediante ausilio di sistemi automatici di intelligenza artificiale (HydroAegis AI) a fini di supporto decisionale. La validazione tecnica definitiva, la conformità normativa e la responsabilità della firma del report rimangono ad esclusivo carico del tecnico abilitato dell'azienda committente.", style_legal)
-                ])
-                
-                doc.build(story)
-                with open(pdf_filename, "rb") as pdf_file:
-                    st.download_button("📥 SCARICA IL REPORT PDF CERTIFICATO", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
