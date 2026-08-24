@@ -16,49 +16,64 @@ st.markdown("""
     div.stButton > button:hover { box-shadow: 0 0 15px rgba(14, 165, 233, 0.6); transform: translateY(-2px); color: white; border: none; }
     .stTextInput>div>div>input, .stTextArea>div>div>textarea { background-color: rgba(15, 23, 42, 0.6); color: #e2e8f0; border: 1px solid #1e3a8a; border-radius: 8px; }
     .stAlert { background-color: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a; color: #e2e8f0; }
-    .req-box { font-size: 13px; margin-top: -10px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
+    .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
+    details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
+# Gestione stato Login
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+if 'do_login' not in st.session_state:
+    st.session_state['do_login'] = False
+
+def trigger_login():
+    st.session_state['do_login'] = True
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: #94a3b8; margin-bottom: 40px;'>Inserisci le credenziali e la Licenza Aziendale.</p>", unsafe_allow_html=True)
     
     col_sx, col_centro, col_dx = st.columns([1, 1.5, 1])
-    
     with col_centro:
         st.markdown("<div style='background-color: rgba(15, 23, 42, 0.6); padding: 30px; border-radius: 15px; border: 1px solid #1e3a8a;'>", unsafe_allow_html=True)
         
         licenza = st.text_input("Codice Licenza Aziendale", type="password", placeholder="Es: LIC-ROV-...")
         username = st.text_input("Nome Utente")
-        password = st.text_input("Password", type="password")
+        password = st.text_input("Password", type="password", on_change=trigger_login) # Attiva l'invio da tastiera
         
         # Logica di validazione password
         has_upper = any(c.isupper() for c in password) if password else False
         has_num = any(c.isdigit() for c in password) if password else False
         has_spec = any(not c.isalnum() for c in password) if password else False
         
-        # Colori dinamici
-        c_up = "#10b981" if has_upper else "#94a3b8"
-        c_num = "#10b981" if has_num else "#94a3b8"
-        c_spec = "#10b981" if has_spec else "#94a3b8"
-        i_up = "✅" if has_upper else "❌"
-        i_num = "✅" if has_num else "❌"
-        i_spec = "✅" if has_spec else "❌"
+        # Gestione estetica icone e colori
+        if not password:
+            i_up = i_num = i_spec = "-"
+            c_up = c_num = c_spec = "#94a3b8"
+        else:
+            i_up, c_up = ("✅", "#10b981") if has_upper else ("❌", "#ef4444")
+            i_num, c_num = ("✅", "#10b981") if has_num else ("❌", "#ef4444")
+            i_spec, c_spec = ("✅", "#10b981") if has_spec else ("❌", "#ef4444")
 
-        # Box requisiti visivi
+        # Box requisiti a tendina
         st.markdown(f"""
-        <div class="req-box">
-            <div style="color: {c_up};">{i_up} Almeno una lettera maiuscola</div>
-            <div style="color: {c_num};">{i_num} Almeno un numero</div>
-            <div style="color: {c_spec};">{i_spec} Almeno un carattere speciale (!, ?, @, ecc.)</div>
-        </div>
+        <details>
+            <summary>ℹ️ Clicca qui per le Regole Password</summary>
+            <div class="req-box">
+                <div style="color: {c_up};">{i_up} Almeno una lettera maiuscola</div>
+                <div style="color: {c_num};">{i_num} Almeno un numero</div>
+                <div style="color: {c_spec};">{i_spec} Almeno un carattere speciale (!, ?, @, ecc.)</div>
+            </div>
+        </details>
         """, unsafe_allow_html=True)
         
-        if st.button("Accedi", use_container_width=True):
+        btn_accedi = st.button("Accedi", use_container_width=True)
+        
+        # Esegue il login sia col click che col tasto Invio
+        if btn_accedi or st.session_state['do_login']:
+            st.session_state['do_login'] = False # Resetta il trigger
+            
             if licenza == "LIC-ROV-2026":
                 if username == "admin" and password == "Mare2026!":
                     st.session_state['logged_in'] = True
