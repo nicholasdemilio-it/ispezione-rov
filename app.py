@@ -43,7 +43,7 @@ if 'do_login' not in st.session_state:
 if 'delete_target' not in st.session_state:
     st.session_state['delete_target'] = None
 
-# Stati di memoria per i campi di inserimento (per permettere il reset pulito)
+# Stati di memoria per i campi di inserimento
 if 'input_cliente' not in st.session_state:
     st.session_state['input_cliente'] = ""
 if 'input_licenza' not in st.session_state:
@@ -51,6 +51,11 @@ if 'input_licenza' not in st.session_state:
 
 def trigger_login():
     st.session_state['do_login'] = True
+
+def genera_codice():
+    p1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    p2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    st.session_state['input_licenza'] = f"LIC-{p1}-{p2}"
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -144,7 +149,7 @@ else:
             if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
                 st.session_state['is_admin'] = False
-                st.session_state['delete_target'] = False
+                st.session_state['delete_target'] = None
                 st.rerun()
         
         st.markdown("---")
@@ -152,7 +157,15 @@ else:
         # 1. Modulo Creazione Nuova Licenza
         with st.expander("➕ Aggiungi Nuovo Cliente e Licenza", expanded=False):
             st.session_state['input_cliente'] = st.text_input("Nome Cliente / Azienda", value=st.session_state['input_cliente'])
-            st.session_state['input_licenza'] = st.text_input("Codice Licenza", value=st.session_state['input_licenza'])
+            
+            col_l1, col_l2 = st.columns([3, 1])
+            with col_l1:
+                st.session_state['input_licenza'] = st.text_input("Codice Licenza", value=st.session_state['input_licenza'])
+            with col_l2:
+                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+                if st.button("Genera", use_container_width=True):
+                    genera_codice()
+                    st.rerun()
             
             btn_crea = st.button("✅ Salva Nuova Licenza", use_container_width=True)
             if btn_crea:
@@ -166,7 +179,7 @@ else:
                         
                         st.success(f"✅ Licenza per {st.session_state['input_cliente']} creata con successo!")
                         
-                        # Resetta i campi svuotando la memoria
+                        # Resetta i campi svuotando la memoria di stato
                         st.session_state['input_cliente'] = ""
                         st.session_state['input_licenza'] = ""
                         
