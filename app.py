@@ -45,29 +45,51 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SISTEMA DI LOGIN ---
+# --- SISTEMA DI LOGIN CON DESCRIZIONE COMMERCIALE ---
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 if not st.session_state['logged_in']:
-    st.title("🔒 Accesso Area Riservata")
-    st.write("Inserisci le tue credenziali per accedere al pannello di ispezione.")
+    st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8; margin-bottom: 40px;'>Inserisci le tue credenziali per accedere alla piattaforma di ispezione.</p>", unsafe_allow_html=True)
     
-    col1, col2 = st.columns([1, 2])
-    with col1:
+    # 3 Colonne per centrare il login (vuota, form, vuota)
+    col_sx, col_centro, col_dx = st.columns([1, 1.5, 1])
+    
+    with col_centro:
+        st.markdown("<div style='background-color: rgba(15, 23, 42, 0.6); padding: 30px; border-radius: 15px; border: 1px solid #1e3a8a;'>", unsafe_allow_html=True)
         username = st.text_input("Nome Utente")
         password = st.text_input("Password", type="password")
         
-        if st.button("Accedi"):
+        if st.button("Accedi", use_container_width=True):
             if username == "admin" and password == "mare2026":
                 st.session_state['logged_in'] = True
                 st.rerun()
             else:
                 st.error("❌ Credenziali errate. Riprova.")
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.write("---")
+    st.write("")
+    
+    # Sezione Marketing / Vantaggi
+    col_testo, _ = st.columns([1, 0.1])
+    with col_testo:
+        st.markdown("""
+        ### 🚀 L'Evoluzione dell'Ispezione Infrastrutturale
+        Questa piattaforma sfrutta un Workflow Agentico ad Intelligenza Artificiale per automatizzare, accelerare e certificare le ispezioni di condotte sottomarine (ROV) e reti idrico-fognarie civili.
+        
+        **Perché scegliere il nostro software? I tuoi Vantaggi Esclusivi:**
+        *   ⏱️ **Risparmio di Tempo del 90%:** L'IA analizza i file video e audio in pochi secondi, liberando gli operatori da ore di noiosa revisione manuale.
+        *   🎯 **Affidabilità Estrema (Doppia Verifica):** Il sistema non si ferma alla prima occhiata. Utilizza un processo in cui un "Supervisore QA Virtuale" controlla e corregge il lavoro del primo agente, eliminando i falsi allarmi causati da sporco, riflessi o interferenze.
+        *   📋 **Standard Internazionali:** Classificazione automatica e rigorosa dei difetti secondo la normativa europea **EN 13508-2**, pronta per enti pubblici o privati.
+        *   🗂️ **Supporto Multi-Formato Avanzato:** Compatibilità totale con sistemi di ripresa professionali. Accetta video ad alta risoluzione (.mp4, .mov, .avi, .mpeg) e tracce audio tattiche (.wav, .mp3, .flac).
+        *   📄 **Pronto per la Consegna:** Generazione immediata di report PDF formali, revisionabili manualmente e pronti per l'approvazione finale.
+        """)
+
 else:
     # --- L'APP VERA E PROPRIA ---
     
-    # LA TUA CHIAVE API PRELEVATA DALLA CASSAFORTE DI STREAMLIT
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
@@ -85,46 +107,57 @@ else:
         ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile")
     )
 
-    uploaded_file = st.file_uploader("Trascina qui il video .mp4 dell'ispezione", type=["mp4"])
+    # Elenco formati supportati espanso
+    formati_accettati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
+    
+    uploaded_file = st.file_uploader(
+        "Trascina qui il file dell'ispezione (Video o Audio)", 
+        type=formati_accettati
+    )
 
     if uploaded_file is not None:
         if st.button("Avvia Analisi con Doppia Verifica"):
             
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
+            # Rileva automaticamente l'estensione del file caricato
+            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                 tmp_file.write(uploaded_file.read())
                 tmp_file_path = tmp_file.name
             
-            with st.spinner("Caricamento del video sui server sicuri..."):
-                video_file = genai.upload_file(path=tmp_file_path)
-                while video_file.state.name == "PROCESSING":
+            with st.spinner("Caricamento del file sui server sicuri..."):
+                media_file = genai.upload_file(path=tmp_file_path)
+                while media_file.state.name == "PROCESSING":
                     time.sleep(3)
-                    video_file = genai.get_file(video_file.name)
+                    media_file = genai.get_file(media_file.name)
             
             model = genai.GenerativeModel(model_name="gemini-3.6-flash")
             
             with st.spinner("Fase 1/2: Scansione IA in corso (rilevamento anomalie primarie)..."):
                 if tipo_ispezione == "Tubazione Sottomarina (ROV)":
-                    ruolo_1 = "Sei un Ispettore Offshore. Trova tutte le possibili anomalie nel video ROV."
+                    ruolo_1 = "Sei un Ispettore Offshore. Trova tutte le possibili anomalie nel file multimediale ROV (video o audio)."
                 else:
-                    ruolo_1 = "Sei un tecnico fognario. Trova tutte le possibili anomalie nel tubo stradale."
+                    ruolo_1 = "Sei un tecnico fognario. Trova tutte le possibili anomalie nel file multimediale della tubazione stradale."
                 
-                prompt_1 = f"{ruolo_1}\nElenca tutte le anomalie che vedi con il minuto esatto. Sii meticoloso, segna anche i casi dubbi."
-                risposta_1 = model.generate_content([video_file, prompt_1])
+                prompt_1 = f"{ruolo_1}\nElenca tutte le anomalie che rilevi con il minuto esatto. Sii meticoloso, segna anche i casi dubbi."
+                risposta_1 = model.generate_content([media_file, prompt_1])
                 bozza_iniziale = risposta_1.text
 
-            with st.spinner("Fase 2/2: Supervisore QA al lavoro (eliminazione falsi positivi e codifica EN 13508-2)..."):
+            with st.spinner("Fase 2/2: Supervisore QA al lavoro (stesura report dettagliato)..."):
                 prompt_2 = f"""
                 Sei un Supervisore di Qualità (QA) Senior per ispezioni di {tipo_ispezione}.
                 Bozza iniziale rilevata:
                 {bozza_iniziale}
                 
                 IL TUO COMPITO:
-                1. Riguarda il video e verifica OGNI punto della bozza.
-                2. ELIMINA i falsi positivi.
-                3. Applica rigorosamente i codici EN 13508-2.
-                NON usare asterischi o formattazione Markdown. Restituisci SOLO il report finale (Minuto, Codice, Descrizione, Gravità).
+                1. Riguarda il file e verifica la bozza. Scarta solo i palesi falsi positivi (es. sporco o riflessi).
+                2. Applica rigorosamente i codici EN 13508-2.
+                3. Per ogni difetto, scrivi una DESCRIZIONE TECNICA ESTREMAMENTE DETTAGLIATA (almeno 2-3 frasi che spieghino l'entità del difetto, l'aspetto e le possibili implicazioni strutturali).
+                4. Aggiungi alla fine un paragrafo riassuntivo intitolato "VALUTAZIONE STRUTTURALE GENERALE".
+                
+                NON usare asterischi o formattazione Markdown. Restituisci SOLO testo puro e discorsivo.
                 """
-                risposta_finale = model.generate_content([video_file, prompt_2])
+                risposta_finale = model.generate_content([media_file, prompt_2])
                 st.session_state['report_text'] = risposta_finale.text
                 
                 os.remove(tmp_file_path)
@@ -132,7 +165,7 @@ else:
     if 'report_text' in st.session_state:
         st.success("✅ Doppia verifica completata con successo!")
         st.subheader("📝 Fase 3: Approvazione Finale dell'Ispettore")
-        testo_revisionato = st.text_area("Bozza Certificata (Modificabile)", value=st.session_state['report_text'], height=300)
+        testo_revisionato = st.text_area("Bozza Certificata (Modificabile)", value=st.session_state['report_text'], height=400)
         
         if st.button("Genera PDF Definitivo"):
             pdf_filename = "Report_Ispezione_Certificato.pdf"
