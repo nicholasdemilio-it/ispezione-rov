@@ -7,7 +7,7 @@ import random
 import string
 import hashlib
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -195,7 +195,7 @@ else:
         st.markdown("---")
         
         with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B (Per la Vendita)", expanded=False):
-            st.write("Compila i dati dell'azienda acquirente per generare istantaneamente il contratto PDF completo di totali, scadenze e termini di pagamento.")
+            st.write("Compila i dati dell'azienda acquirente per generare istantaneamente il contratto PDF calibrato sulla formula scelta (annuale o mensile).")
             
             c_ord1, c_ord2 = st.columns(2)
             with c_ord1:
@@ -204,15 +204,14 @@ else:
                 cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
                 giorno_rinnovo = st.number_input("Giorno del mese per la scadenza/rinnovo", min_value=1, max_value=31, value=1)
             with c_ord2:
-                tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone mensile agevolato)", "Abbonamento Mensile Flessibile (Senza vincoli)"))
-                prezzo_mensile = st.number_input("Canone Mensile Imponibile (€ + IVA)", min_value=100, max_value=5000, value=390)
+                tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone mensile agevolato con impegno 12 mesi)", "Abbonamento Mensile Flessibile (Senza vincoli, disdetta 30 giorni)"))
+                prezzo_mensile = st.number_input("Canone Mensile Imponibile (€ + IVA)", min_value=100, max_value=5000, value=390 if "Annuale" in tipo_piano else 490)
                 report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
             
-            # Calcolo automatico IVA (22%) e totale
             iva_mese = prezzo_mensile * 0.22
             totale_mese_iva = prezzo_mensile + iva_mese
 
-            st.info(f"💡 **Riepilogo Economico Automatico:** Canone Imponibile: €{prezzo_mensile:.2f} + IVA 22% (€{iva_mese:.2f}) = **Totale da pagare ogni mese: €{totale_mese_iva:.2f} IVA inclusa**")
+            st.info(f"💡 **Riepilogo Economico Automatico ({tipo_piano}):** Canone Imponibile: €{prezzo_mensile:.2f} + IVA 22% (€{iva_mese:.2f}) = **Totale mensile: €{totale_mese_iva:.2f} IVA inclusa**")
 
             if st.button("📥 Genera PDF Modulo d'Ordine B2B", use_container_width=True):
                 if cli_nome and cli_piva:
@@ -223,15 +222,21 @@ else:
                     style_titolo_ord = ParagraphStyle('TitleOrd', parent=styles_ord['Heading1'], fontSize=14, leading=17, spaceAfter=8, textColor=colors.HexColor("#0b1a30"))
                     style_testo_ord = ParagraphStyle('TextOrd', parent=styles_ord['Normal'], fontSize=9.5, leading=13.5, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
                     
+                    # Testo dinamico in base al piano scelto per riflettere correttamente il prezzo e la natura del contratto
+                    if "Annuale" in tipo_piano:
+                        dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura.<br/>• Condizioni di recesso: Impegno annuale con fatturazione e pagamento mensile ricorrente."
+                    else:
+                        dettaglio_durata = "• Durata Contratto: <b>Mensile rinnovabile</b> senza vincoli di durata pluriennale.<br/>• Condizioni di recesso: Disdicibile con preavviso scritto di almeno 30 giorni prima della scadenza mensile."
+
                     story_ord = [
                         Paragraph("<b>MODULO D'ORDINE E PROPOSTA DI ABBONAMENTO SaaS B2B</b>", style_titolo_ord),
                         Paragraph("<b>HydroAegis AI – Piattaforma di Ispezione Automatica e Certificazione Forense</b>", style_testo_ord),
                         Spacer(1, 6),
                         Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome}<br/>• P.IVA / C.F.: {cli_piva}<br/>• Email Referente: {cli_email}", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: {tipo_piano}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• Canone Mensile Imponibile: € {prezzo_mensile:.2f}<br/>• IVA di Legge (22%): € {iva_mese:.2f}<br/>• <b>TOTALE DOVUTO MENSILE (IVA Inclusa): € {totale_mese_iva:.2f}</b>", style_testo_ord),
+                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: <b>{tipo_piano}</b><br/>{dettaglio_durata}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• Canone Mensile Imponibile: € {prezzo_mensile:.2f}<br/>• IVA di Legge (22%): € {iva_mese:.2f}<br/>• <b>TOTALE DOVUTO MENSILE (IVA Inclusa): € {totale_mese_iva:.2f}</b>", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph(f"<b>3. MODALITÀ E TERMINI DI PAGAMENTO:</b><br/>• Scadenza Pagamento: Il <b>{giorno_rinnovo} di ogni mese</b> solare.<br/>• Metodo di Pagamento: Bonifico bancario anticipato a 5 giorni data fattura.<br/>• Decorrenza Abbonamento: A far data dalla ricezione del presente modulo controfirmato e rilascio delle credenziali di accesso.", style_testo_ord),
+                        Paragraph(f"<b>3. MODALITÀ E TERMINI DI PAGAMENTO:</b><br/>• Scadenza Pagamento: Il <b>{giorno_rinnovo} di ogni mese</b> solare.<br/>• Metodo di Pagamento: Bonifico bancario anticipato a 5 giorni data fattura.<br/>• Decorrenza Abbonamento: A far data dalla ricezione del presente modulo controfirmato e rilascio delle credenziali.", style_testo_ord),
                         Spacer(1, 4),
                         Paragraph("<b>4. LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce uno strumento di supporto decisionale basato su IA. La validazione tecnica definitiva, la conformità alla norma EN 13508-2 e la responsabilità della firma del report rimangono a totale ed esclusivo carico del tecnico abilitato dell'azienda committente.", style_testo_ord),
                         Spacer(1, 4),
@@ -243,7 +248,7 @@ else:
                     
                     with open(ordine_filename, "rb") as f_ord:
                         st.download_button("⬇️ SCARICA IL MODULO D'ORDINE COMPILATO", data=f_ord, file_name=ordine_filename, mime="application/pdf")
-                    st.success("✅ Modulo d'Ordine generato con successo!")
+                    st.success("✅ Modulo d'Ordine generato con successo e calibrato sul piano scelto!")
                 else:
                     st.warning("⚠️ Inserisci almeno la Ragione Sociale e la Partita IVA dell'azienda.")
 
@@ -455,7 +460,7 @@ else:
                             ruolo = "Sei un Ispettore Tecnico Offshore. Analizza il filmato ROV e identifica le anomalie con timestamp esatto." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Analizza l'ispezione e rileva tutte le anomalie strutturali con timestamp."
                             bozza = model.generate_content([media_file, f"{ruolo}\nFornisci l'elenco preliminare delle anomalie."]).text
 
-                        with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI & Standard EN 13508-2)..."):
+                        with st.spinner("Fase 2/3: Supervisore QA al lavoro (Calcolo IQI & Standard EN 13508-2)..."):
                             prompt_2 = f"""Sei un Supervisore Tecnico QA per certificazioni infrastrutturali. 
                             Analizza la bozza seguente:
                             {bozza}
@@ -470,13 +475,25 @@ else:
                                - VALUTAZIONE STRUTTURALE GENERALE E CONCLUSIONI
                             5. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, VIETATO USARE CANCELLETTI (#), VIETATO USARE QUALSIASI SIMBOLO DI MARKDOWN. Scrivi solo testo pulito, formale e ingegneristico."""
                             
-                            testo_generato = model.generate_content([media_file, prompt_2]).text
+                            bozza_qa = model.generate_content([media_file, prompt_2]).text
+
+                        with st.spinner("Fase 3/3: Correttore Ortografico e Revisione Sintattica in corso..."):
+                            prompt_3 = f"""Sei un revisore di testi tecnici e peritali di livello universitario in lingua italiana. 
+                            Rileggi il seguente rapporto tecnico e correggi rigorosamente qualsiasi errore di grammatica, sintassi, concordanza o punteggiatura imperfetta. Rendi la forma fluida, impeccabile e formalmente ineccepibile per un atto ingegneristico ufficiale.
+                            Mantieni inalterati i codici normativi EN 13508-2, le classi IQI e i timestamp numerici.
+                            
+                            Testo da correggere:
+                            {bozza_qa}
+                            
+                            Restituisci esclusivamente il testo definitivo corretto in italiano pulito, senza asterischi o simboli di markdown."""
+                            
+                            testo_generato = model.generate_content(prompt_3).text
                             st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
                             os.remove(tmp_file_path)
 
         # --- CONFERMA DI COMPLETAMENTO SOPRA LE ISTRUZIONI ---
         if 'report_text' in st.session_state:
-            st.success("✅ Doppia verifica completata con successo e classificazione IQI inclusa!")
+            st.success("✅ Doppia verifica e correzione ortografica completate con successo!")
             testo_revisionato = st.text_area("Bozza Certificata (Modificabile)", value=st.session_state['report_text'], height=400)
             
             if st.button("Genera PDF Definitivo con Impronta Forense"):
@@ -520,7 +537,7 @@ else:
                     ],
                     [
                         Paragraph(f"<b>Committente:</b> {cliente}", style_meta),
-                        Paragraph("<b>Stato Procedura:</b> Convalidato", style_meta)
+                        Paragraph("<b>Stato Procedura:</b> Convalidato e Revisionato", style_meta)
                     ]
                 ]
                 
