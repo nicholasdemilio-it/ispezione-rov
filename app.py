@@ -108,7 +108,7 @@ if not st.session_state['logged_in']:
                         else:
                             st.error("🚫 Codice Licenza inesistente.")
                     except Exception as e:
-                        st.error(f"Errore tecnico: {e}")
+                        st.error("Errore di connessione al database di sicurezza.")
                 else:
                     st.error("⚠️ La password non rispetta i requisiti minimi.")
             else:
