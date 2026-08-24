@@ -6,6 +6,7 @@ import time
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from supabase import create_client, Client
 
 st.set_page_config(page_title="Ispettore IA multi-settore", page_icon="🔍", layout="wide")
 
@@ -20,6 +21,15 @@ st.markdown("""
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
+
+# Inizializzazione Supabase
+@st.cache_resource
+def init_supabase():
+    url = st.secrets["SUPABASE_URL"]
+    key = st.secrets["SUPABASE_KEY"]
+    return create_client(url, key)
+
+supabase: Client = init_supabase()
 
 # Gestione stato Login e Ruoli
 if 'logged_in' not in st.session_state:
@@ -70,23 +80,37 @@ if not st.session_state['logged_in']:
         if btn_accedi or st.session_state['do_login']:
             st.session_state['do_login'] = False
             
-            # 1. ACCESSO SUPER ADMIN (Tu)
+            # 1. ACCESSO SUPER ADMIN (Tu - senza licenza)
             if username == "admin" and password == "Mare2026!":
                 st.session_state['logged_in'] = True
                 st.session_state['is_admin'] = True
                 st.rerun()
                 
-            # 2. ACCESSO CLIENTE (Richiede requisiti completi)
+            # 2. ACCESSO CLIENTE (Verifica su Supabase)
             elif username == "cliente1" and password == "Mare2026!":
-                if licenza == "LIC-ROV-2026":
-                    if has_upper and has_num and has_spec:
-                        st.session_state['logged_in'] = True
-                        st.session_state['is_admin'] = False
-                        st.rerun()
-                    else:
-                        st.error("⚠️ La password non rispetta i requisiti di sicurezza minimi.")
+                if has_upper and has_num and has_spec:
+                    try:
+                        # Controlla la licenza nel database Supabase
+                        response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
+                        dati = response.data
+                        
+                        if len(dati) > 0:
+                            licenza_valida = dati[0].get("attiva", False)
+                            nome_cliente = dati[0].get("cliente", "Sconosciuto")
+                            
+                            if licenza_valida:
+                                st.session_state['logged_in'] = True
+                                st.session_state['is_admin'] = False
+                                st.session_state['nome_cliente'] = nome_cliente # Salviamo chi è entrato
+                                st.rerun()
+                            else:
+                                st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
+                        else:
+                            st.error("🚫 Codice Licenza inesistente.")
+                    except Exception as e:
+                        st.error(f"Errore di connessione al database di sicurezza.")
                 else:
-                    st.error("🚫 Codice Licenza non valido o scaduto.")
+                    st.error("⚠️ La password non rispetta i requisiti minimi.")
             else:
                 st.error("❌ Credenziali errate.")
     
@@ -95,7 +119,7 @@ if not st.session_state['logged_in']:
     with col_testo:
         st.markdown("""
         ### 🚀 L'Evoluzione dell'Ispezione Infrastrutturale
-        Questa piattaforma sfrutta un Workflow Agentico ad Intelligenza Artificiale per automatizzare, accelerare e certificare le ispezioni di condotte sottomarine (ROV) e reti idrico-fognarie civili.
+        Questa piattaforma sfrutta un Workflow Agentico ad Intelligenza Artificiale per automatizzare, accelerare e certificare le ispezioni.
         """)
 
 else:
@@ -107,20 +131,20 @@ else:
         col1, col2 = st.columns([5, 1])
         with col1:
             st.title("⚙️ Pannello di Controllo (Super Admin)")
-            st.write("Benvenuto Direttore. Da qui potrai gestire Clienti, Licenze e visualizzare gli Audit Log (quando Supabase sarà collegato).")
+            st.write("Qui in futuro appariranno tutti i dati di Supabase in tempo reale.")
         with col2:
             if st.button("🚪 Esci (Logout)"):
                 st.session_state['logged_in'] = False
                 st.session_state['is_admin'] = False
                 st.rerun()
                 
-        st.info("💡 Attualmente sei in modalità Admin. L'interfaccia di ispezione è nascosta. Nei prossimi step costruiremo qui la dashboard di gestione Supabase.")
-        
-    # --- VISUALE CLIENTE (Il software operativo) ---
+    # --- VISUALE CLIENTE ---
     else:
         col1, col2 = st.columns([5, 1])
         with col1:
             st.title("🔍 Piattaforma di Ispezione Automatica")
+            cliente = st.session_state.get('nome_cliente', 'Cliente')
+            st.success(f"Autenticazione verificata via server. Benvenuto, **{cliente}**.")
         with col2:
             if st.button("🚪 Esci (Logout)"):
                 st.session_state['logged_in'] = False
@@ -149,14 +173,13 @@ else:
                 
                 with st.spinner("Fase 1/2: Scansione IA in corso..."):
                     ruolo = "Sei un Ispettore Offshore. Trova le anomalie nel file ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un tecnico fognario. Trova le anomalie nella tubazione."
-                    prompt_1 = f"{ruolo}\nElenca le anomalie con il minuto esatto."
-                    bozza = model.generate_content([media_file, prompt_1]).text
+                    bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie con il minuto esatto."]).text
 
                 with st.spinner("Fase 2/2: Supervisore QA al lavoro..."):
                     prompt_2 = f"""Sei un Supervisore QA. Bozza: {bozza}
                     1. Scarta i falsi positivi.
                     2. Applica i codici EN 13508-2.
-                    3. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE (entità, aspetto, implicazioni).
+                    3. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
                     4. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
                     st.session_state['report_text'] = model.generate_content([media_file, prompt_2]).text
                     os.remove(tmp_file_path)
