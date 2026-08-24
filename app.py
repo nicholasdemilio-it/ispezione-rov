@@ -21,7 +21,7 @@ st.markdown("""
     .stApp { background: radial-gradient(circle at top left, #0b1a30 0%, #050b14 100%); color: #f1f5f9; }
     div.stButton > button { background: linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 100%); color: white; border: none; border-radius: 8px; font-weight: 600; transition: all 0.3s ease; }
     div.stButton > button:hover { box-shadow: 0 0 15px rgba(14, 165, 233, 0.6); transform: translateY(-2px); color: white; border: none; }
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea { background-color: rgba(15, 23, 42, 0.6); color: #e2e8f0; border: 1px solid #1e3a8a; border-radius: 8px; }
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div { background-color: rgba(15, 23, 42, 0.6); color: #e2e8f0; border: 1px solid #1e3a8a; border-radius: 8px; }
     .stAlert { background-color: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a; color: #e2e8f0; }
     .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
@@ -195,24 +195,27 @@ else:
         st.markdown("---")
         
         with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B (Per la Vendita)", expanded=False):
-            st.write("Genera il contratto PDF completo di clausole per la legge italiana (Doppia Firma, Art. 1341 c.c.).")
+            st.write("Compila il form senza interruzioni. L'uso di questa maschera bloccata impedisce aggiornamenti accidentali durante la digitazione.")
             
-            c_ord1, c_ord2 = st.columns(2)
-            with c_ord1:
-                cli_nome = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl")
-                cli_piva = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890")
-                cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
-                giorno_rinnovo = st.number_input("Giorno del mese per la scadenza/rinnovo", min_value=1, max_value=31, value=1)
-            with c_ord2:
-                tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone mensile agevolato con impegno 12 mesi)", "Abbonamento Mensile Flessibile (Senza vincoli, disdetta 30 giorni)"))
-                prezzo_mensile = st.number_input("Canone Mensile Imponibile (€ + IVA)", min_value=100, max_value=5000, value=390 if "Annuale" in tipo_piano else 490)
-                report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
-            
-            iva_mese = prezzo_mensile * 0.22
-            totale_mese_iva = prezzo_mensile + iva_mese
+            with st.form("form_contratto_b2b"):
+                c_ord1, c_ord2 = st.columns(2)
+                with c_ord1:
+                    cli_nome = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl")
+                    cli_piva = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890")
+                    cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
+                    giorno_rinnovo = st.number_input("Giorno del mese per scadenza/rinnovo", min_value=1, max_value=31, value=1)
+                with c_ord2:
+                    tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone agevolato con impegno 12 mesi)", "Abbonamento Mensile Flessibile (Senza vincoli, disdetta 30 giorni)"))
+                    prezzo_mensile = st.number_input("Canone Mensile Imponibile (€ + IVA)", min_value=100, max_value=5000, value=390)
+                    report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
+                
+                btn_genera_pdf = st.form_submit_button("⚙️ Prepara Contratto in PDF", use_container_width=True)
 
-            if st.button("📥 Genera PDF Modulo d'Ordine B2B", use_container_width=True):
-                if cli_nome and cli_piva:
+            if btn_genera_pdf:
+                if cli_nome and cli_piva and cli_email:
+                    iva_mese = prezzo_mensile * 0.22
+                    totale_mese_iva = prezzo_mensile + iva_mese
+                    
                     ordine_filename = f"Modulo_Ordine_HydroAegis_{cli_nome.replace(' ', '_')}.pdf"
                     doc_ord = SimpleDocTemplate(ordine_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=30, bottomMargin=30)
                     styles_ord = getSampleStyleSheet()
@@ -251,10 +254,14 @@ else:
                     doc_ord.build(story_ord)
                     
                     with open(ordine_filename, "rb") as f_ord:
-                        st.download_button("⬇️ SCARICA IL CONTRATTO B2B COMPILATO", data=f_ord, file_name=ordine_filename, mime="application/pdf")
-                    st.success("✅ Modulo d'Ordine generato con 'Doppia Firma' legale inclusa!")
+                        st.session_state['pdf_ord_bytes'] = f_ord.read()
+                        st.session_state['pdf_ord_name'] = ordine_filename
                 else:
-                    st.warning("⚠️ Inserisci almeno la Ragione Sociale e la Partita IVA.")
+                    st.warning("⚠️ Inserisci almeno la Ragione Sociale, P.IVA e l'Email per generare il contratto.")
+            
+            if 'pdf_ord_bytes' in st.session_state:
+                st.success("✅ Modulo d'Ordine generato con successo! Scaricalo qui sotto:")
+                st.download_button("⬇️ SCARICA IL CONTRATTO B2B COMPILATO", data=st.session_state['pdf_ord_bytes'], file_name=st.session_state['pdf_ord_name'], mime="application/pdf")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -312,58 +319,61 @@ else:
                     st.warning("⚠️ Compila entrambi i campi.")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.subheader("👥 Database Clienti")
-        ricerca = st.text_input("🔍 Cerca per nome o codice...", placeholder="Digita qui...")
         
-        try:
-            risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
-            dati_licenze = risposta.data
+        # --- MODIFICA: DATABASE CLIENTI NASCOSTO IN UN EXPANDER ---
+        with st.expander("👥 Database Clienti (Riservato)", expanded=False):
+            st.write("Gestisci le licenze, visualizza l'utilizzo e sospendi/riattiva i clienti in totale riservatezza.")
+            ricerca = st.text_input("🔍 Cerca per nome o codice...", placeholder="Digita qui...")
             
-            if ricerca:
-                dati_licenze = [d for d in dati_licenze if ricerca.lower() in d['cliente'].lower() or ricerca.lower() in d['codice_licenza'].lower()]
-            
-            if dati_licenze:
-                for i, riga in enumerate(dati_licenze):
-                    if st.session_state['delete_target'] == riga['codice_licenza']:
-                        st.warning(f"⚠️ Eliminare definitivamente '{riga['cliente']}'?")
-                        col_yes, col_no, _ = st.columns([1, 1, 3])
-                        with col_yes:
-                            if st.button("Sì, Elimina", key=f"yes_{riga['codice_licenza']}", use_container_width=True):
-                                supabase.table("licenze").delete().eq("codice_licenza", riga['codice_licenza']).execute()
-                                st.session_state['delete_target'] = None
-                                st.rerun()
-                        with col_no:
-                            if st.button("Annulla", key=f"no_{riga['codice_licenza']}", use_container_width=True):
-                                st.session_state['delete_target'] = None
-                                st.rerun()
-                    else:
-                        bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
-                        limite = riga.get('limite_report', 50)
-                        consumati = riga.get('report_consumati', 0)
-                        
-                        c_del, c_info, c_act = st.columns([0.4, 4.5, 1])
-                        with c_del:
-                            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-                            if st.button("❌", key=f"del_{riga['codice_licenza']}"):
-                                st.session_state['delete_target'] = riga['codice_licenza']
-                                st.rerun()
-                        with c_info:
-                            stato = "🟢 Attivo" if riga['attiva'] else "🔴 Sospeso"
-                            st.markdown(f"""
-                            <div style="background-color: {bg_color}; padding: 14px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between;">
-                                <span style="font-weight: bold; width: 35%;">{riga['cliente']}</span>
-                                <span style="font-family: monospace; color: #38bdf8; width: 35%;">{riga['codice_licenza']}</span>
-                                <span style="width: 30%; font-size: 13px; color: #94a3b8;">{stato} | {consumati}/{limite} rep.</span>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        with c_act:
-                            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-                            lbl = "Sospendi" if riga['attiva'] else "Riattiva"
-                            if st.button(lbl, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
-                                supabase.table("licenze").update({"attiva": not riga['attiva']}).eq("codice_licenza", riga['codice_licenza']).execute()
-                                st.rerun()
-        except:
-            st.error("Errore di connessione a Supabase.")
+            try:
+                risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
+                dati_licenze = risposta.data
+                
+                if ricerca:
+                    dati_licenze = [d for d in dati_licenze if ricerca.lower() in d['cliente'].lower() or ricerca.lower() in d['codice_licenza'].lower()]
+                
+                if dati_licenze:
+                    for i, riga in enumerate(dati_licenze):
+                        if st.session_state['delete_target'] == riga['codice_licenza']:
+                            st.warning(f"⚠️ Eliminare definitivamente '{riga['cliente']}'?")
+                            col_yes, col_no, _ = st.columns([1, 1, 3])
+                            with col_yes:
+                                if st.button("Sì, Elimina", key=f"yes_{riga['codice_licenza']}", use_container_width=True):
+                                    supabase.table("licenze").delete().eq("codice_licenza", riga['codice_licenza']).execute()
+                                    st.session_state['delete_target'] = None
+                                    st.rerun()
+                            with col_no:
+                                if st.button("Annulla", key=f"no_{riga['codice_licenza']}", use_container_width=True):
+                                    st.session_state['delete_target'] = None
+                                    st.rerun()
+                        else:
+                            bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
+                            limite = riga.get('limite_report', 50)
+                            consumati = riga.get('report_consumati', 0)
+                            
+                            c_del, c_info, c_act = st.columns([0.4, 4.5, 1])
+                            with c_del:
+                                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                                if st.button("❌", key=f"del_{riga['codice_licenza']}"):
+                                    st.session_state['delete_target'] = riga['codice_licenza']
+                                    st.rerun()
+                            with c_info:
+                                stato = "🟢 Attivo" if riga['attiva'] else "🔴 Sospeso"
+                                st.markdown(f"""
+                                <div style="background-color: {bg_color}; padding: 14px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between;">
+                                    <span style="font-weight: bold; width: 35%;">{riga['cliente']}</span>
+                                    <span style="font-family: monospace; color: #38bdf8; width: 35%;">{riga['codice_licenza']}</span>
+                                    <span style="width: 30%; font-size: 13px; color: #94a3b8;">{stato} | {consumati}/{limite} rep.</span>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            with c_act:
+                                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                                lbl = "Sospendi" if riga['attiva'] else "Riattiva"
+                                if st.button(lbl, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
+                                    supabase.table("licenze").update({"attiva": not riga['attiva']}).eq("codice_licenza", riga['codice_licenza']).execute()
+                                    st.rerun()
+            except:
+                st.error("Errore di connessione a Supabase.")
                 
     # --- VISUALE CLIENTE ---
     else:
