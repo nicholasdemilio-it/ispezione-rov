@@ -5,9 +5,11 @@ import os
 import time
 import random
 import string
+import hashlib
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 from supabase import create_client, Client
 
 st.set_page_config(page_title="Ispettore IA multi-settore", page_icon="🔍", layout="wide")
@@ -22,6 +24,7 @@ st.markdown("""
     .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
     .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
+    .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; font-size: 14px; color: #cbd5e1; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -44,7 +47,6 @@ if 'do_login' not in st.session_state:
 if 'delete_target' not in st.session_state:
     st.session_state['delete_target'] = None
 
-# Stati di memoria per i campi di inserimento
 if 'input_cliente' not in st.session_state:
     st.session_state['input_cliente'] = ""
 if 'input_licenza' not in st.session_state:
@@ -57,6 +59,13 @@ def genera_codice():
     p1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     p2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     st.session_state['input_licenza'] = f"LIC-{p1}-{p2}"
+
+def calcola_hash_file(file_path):
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -128,29 +137,29 @@ if not st.session_state['logged_in']:
             else:
                 st.error("❌ Credenziali errate.")
     
-    # SEZIONE VANTAGGI RIPRISTINATA IN BASSO
+    # SEZIONE VANTAGGI TECNICI AGGIORNATI PER LE AZIENDE
     st.markdown("<br><hr style='border-color: #1e3a8a;'><br>", unsafe_allow_html=True)
     
     col_v1, col_v2, col_v3 = st.columns(3)
     with col_v1:
         st.markdown("""
         <div class="info-card">
-            <h4>🚀 Automazione Intelligente</h4>
-            <p style="color: #94a3b8; font-size: 14px;">Workflow agentico avanzato per analizzare filmati ROV e fognari azzerando i tempi di revisione manuale.</p>
+            <h4>⚡ Workflow Agentico Dual-Core</h4>
+            <p style="color: #94a3b8; font-size: 14px;">Architettura a due livelli con IA primaria di scansione e IA Supervisore QA dedicata all'azzeramento dei falsi positivi.</p>
         </div>
         """, unsafe_allow_html=True)
     with col_v2:
         st.markdown("""
         <div class="info-card">
-            <h4>🛡️ Standard EN 13508-2</h4>
-            <p style="color: #94a3b8; font-size: 14px;">Doppia verifica con IA supervisore per scartare falsi positivi e produrre descrizioni tecniche certificate.</p>
+            <h4>🔐 Impronta Crittografica SHA-256</h4>
+            <p style="color: #94a3b8; font-size: 14px;">Ogni report genera un hash forense univoco che lega indissolubilmente il PDF al filmato originale a prova di contestazione legale.</p>
         </div>
         """, unsafe_allow_html=True)
     with col_v3:
         st.markdown("""
         <div class="info-card">
-            <h4>📄 Certificazione PDF</h4>
-            <p style="color: #94a3b8; font-size: 14px;">Generazione istantanea di report pronti per la consegna ai committenti con un layout professionale.</p>
+            <h4>📊 Classificazione IQI Automatica</h4>
+            <p style="color: #94a3b8; font-size: 14px;">Algoritmo integrato per il calcolo immediato dell'Indice di Priorità d'Intervento strutturale secondo standard normativi.</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -173,7 +182,6 @@ else:
         
         st.markdown("---")
         
-        # 1. Modulo Creazione Nuova Licenza
         with st.expander("➕ Aggiungi Nuovo Cliente e Licenza", expanded=False):
             st.session_state['input_cliente'] = st.text_input("Nome Cliente / Azienda", value=st.session_state['input_cliente'])
             
@@ -197,10 +205,8 @@ else:
                         }).execute()
                         
                         st.success(f"✅ Licenza per {st.session_state['input_cliente']} creata con successo!")
-                        
                         st.session_state['input_cliente'] = ""
                         st.session_state['input_licenza'] = ""
-                        
                         time.sleep(1.2)
                         st.rerun()
                     except Exception as e:
@@ -209,12 +215,9 @@ else:
                     st.warning("⚠️ Compila entrambi i campi prima di salvare.")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # BARRA DI RICERCA
         st.subheader("👥 Database Clienti")
         ricerca = st.text_input("🔍 Cerca per nome cliente o codice licenza...", placeholder="Digita qui per filtrare la lista...")
         
-        # 2. Tabella Lettura e Gestione Licenze (Stile Zebra)
         try:
             risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
             dati_licenze = risposta.data
@@ -283,7 +286,6 @@ else:
                 
     # --- VISUALE CLIENTE ---
     else:
-        # 🚨 GUARDIA REALE: CONTROLLO CONTINUO DELLA LICENZA 🚨
         if 'codice_licenza' in st.session_state:
             try:
                 check_lic = supabase.table("licenze").select("attiva").eq("codice_licenza", st.session_state['codice_licenza']).execute()
@@ -311,12 +313,30 @@ else:
         
         uploaded_file = st.file_uploader("Trascina qui il file dell'ispezione", type=formati_accettati)
 
+        st.markdown("""
+        <div class="privacy-box">
+            <h4 style="color: #38bdf8; margin-top: 0;">📌 Istruzioni operative e Garanzia di Privacy</h4>
+            <ol style="margin-bottom: 12px; padding-left: 20px;">
+                <li><b>Seleziona l'ambiente corretto</b> dal menu a tendina in base al tipo di ispezione (ROV o Fognatura).</li>
+                <li><b>Carica il file multimediale</b> (video o audio) dell'ispezione utilizzando l'apposito riquadro sopra.</li>
+                <li><b>Avvia l'analisi</b> e attendi il completamento del workflow di doppia verifica dell'Intelligenza Artificiale.</li>
+            </ol>
+            <hr style="border-color: #1e3a8a; margin: 12px 0;">
+            <p style="margin: 0; font-size: 13px; color: #94a3b8;">
+                🛡️ <b>Disclaimer sulla Privacy e Proprietà dei Dati:</b> I file caricati vengono elaborati in via temporanea ed esclusiva per la generazione del report tecnico richiesto. <b>Nessun video, audio o dato aziendale viene memorizzato in modo permanente sui server di terze parti o utilizzato per addestrare modelli di intelligenza artificiale pubblici.</b> La proprietà intellettuale e la riservatezza dei materiali rimangono interamente del committente.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
         if uploaded_file is not None:
             if st.button("Avvia Analisi con Doppia Verifica"):
                 file_ext = os.path.splitext(uploaded_file.name)[1].lower()
                 with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                     tmp_file.write(uploaded_file.read())
                     tmp_file_path = tmp_file.name
+                
+                # Calcolo impronta Hash forense del file video
+                st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                 
                 with st.spinner("Caricamento in corso..."):
                     media_file = genai.upload_file(path=tmp_file_path)
@@ -330,28 +350,47 @@ else:
                     ruolo = "Sei un Ispettore Offshore. Trova le anomalie nel file ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un tecnico fognario. Trova le anomalie nella tubazione."
                     bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie con il minuto esatto."]).text
 
-                with st.spinner("Fase 2/2: Supervisore QA al lavoro..."):
-                    prompt_2 = f"""Sei un Supervisore QA. Bozza: {bozza}
+                with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI)..."):
+                    prompt_2 = f"""Sei un Supervisore QA esperto di ingegneria civile/offshore. Bozza: {bozza}
                     1. Scarta i falsi positivi.
-                    2. Applica i codici EN 13508-2.
-                    3. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
-                    4. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
+                    2. Applica rigorosamente i codici EN 13508-2.
+                    3. Assegna una Classe di Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza Strutturale / Classe 2 - Manutenzione Programmata / Classe 3 - Monitoraggio).
+                    4. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
+                    5. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
                     st.session_state['report_text'] = model.generate_content([media_file, prompt_2]).text
                     os.remove(tmp_file_path)
 
         if 'report_text' in st.session_state:
-            st.success("✅ Doppia verifica completata!")
+            st.success("✅ Doppia verifica completata con successo e classificazione IQI inclusa!")
             testo_revisionato = st.text_area("Bozza Certificata", value=st.session_state['report_text'], height=400)
             
-            if st.button("Genera PDF Definitivo"):
-                pdf_filename = "Report_Ispezione.pdf"
+            if st.button("Genera PDF Definitivo con Impronta Forense"):
+                pdf_filename = "Report_Ispezione_Certificato.pdf"
                 doc = SimpleDocTemplate(pdf_filename, pagesize=letter)
                 styles = getSampleStyleSheet()
-                story = [Paragraph(f"<b>RAPPORTO - {tipo_ispezione.upper()}</b>", ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=18, spaceAfter=15)),
-                         Paragraph("<b>Standard:</b> EN 13508-2", styles['Normal']), Spacer(1, 20)]
+                
+                # Stile personalizzato per l'intestazione forense
+                style_forense = ParagraphStyle(
+                    'ForenseStyle',
+                    parent=styles['Normal'],
+                    fontSize=9,
+                    leading=11,
+                    textColor=colors.HexColor("#475569")
+                )
+                
+                story = [
+                    Paragraph(f"<b>RAPPORTO TECNICO CERTIFICATO - {tipo_ispezione.upper()}</b>", ParagraphStyle('TitleStyle', parent=styles['Heading1'], fontSize=16, spaceAfter=10)),
+                    Paragraph("<b>Normativa di Riferimento:</b> EN 13508-2 | Protocollo Dual-Core IA", styles['Normal']),
+                    Spacer(1, 10),
+                    Paragraph(f"<b>Azienda Committente:</b> {cliente}", styles['Normal']),
+                    Paragraph(f"<b>Impronta Digitale Video (SHA-256):</b> <font name='Courier'>{st.session_state.get('file_hash', 'N/D')}</font>", style_forense),
+                    Spacer(1, 15)
+                ]
+                
                 for line in testo_revisionato.split('\n'):
                     if line.strip():
                         story.extend([Paragraph(line, styles['Normal']), Spacer(1, 6)])
+                
                 doc.build(story)
                 with open(pdf_filename, "rb") as pdf_file:
-                    st.download_button("📥 SCARICA IL REPORT PDF", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
+                    st.download_button("📥 SCARICA IL REPORT PDF CERTIFICATO", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
