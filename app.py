@@ -195,7 +195,7 @@ else:
         st.markdown("---")
         
         with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B (Per la Vendita)", expanded=False):
-            st.write("Genera il contratto PDF completo di tutte le clausole legali SaaS B2B, totali e scadenze.")
+            st.write("Genera il contratto PDF completo di clausole per la legge italiana (Doppia Firma, Art. 1341 c.c.).")
             
             c_ord1, c_ord2 = st.columns(2)
             with c_ord1:
@@ -211,45 +211,48 @@ else:
             iva_mese = prezzo_mensile * 0.22
             totale_mese_iva = prezzo_mensile + iva_mese
 
-            st.info(f"💡 **Riepilogo Economico Automatico ({tipo_piano}):** Canone Imponibile: €{prezzo_mensile:.2f} + IVA 22% (€{iva_mese:.2f}) = **Totale mensile: €{totale_mese_iva:.2f} IVA inclusa**")
-
             if st.button("📥 Genera PDF Modulo d'Ordine B2B", use_container_width=True):
                 if cli_nome and cli_piva:
                     ordine_filename = f"Modulo_Ordine_HydroAegis_{cli_nome.replace(' ', '_')}.pdf"
-                    doc_ord = SimpleDocTemplate(ordine_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+                    doc_ord = SimpleDocTemplate(ordine_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=30, bottomMargin=30)
                     styles_ord = getSampleStyleSheet()
                     
-                    style_titolo_ord = ParagraphStyle('TitleOrd', parent=styles_ord['Heading1'], fontSize=13, leading=16, spaceAfter=8, textColor=colors.HexColor("#0b1a30"))
-                    style_testo_ord = ParagraphStyle('TextOrd', parent=styles_ord['Normal'], fontSize=8.5, leading=11.5, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
+                    style_titolo_ord = ParagraphStyle('TitleOrd', parent=styles_ord['Heading1'], fontSize=13, leading=16, spaceAfter=10, textColor=colors.HexColor("#0b1a30"))
+                    style_testo_ord = ParagraphStyle('TextOrd', parent=styles_ord['Normal'], fontSize=8.5, leading=11, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
+                    style_doppia_firma = ParagraphStyle('DoppiaFirma', parent=styles_ord['Normal'], fontSize=7.5, leading=9.5, spaceAfter=8, textColor=colors.HexColor("#334155"), fontName="Helvetica-Oblique")
                     
                     if "Annuale" in tipo_piano:
-                        dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura.<br/>• Condizioni di recesso: Impegno annuale con fatturazione e pagamento mensile ricorrente."
+                        dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura.<br/>• Condizioni di recesso: Impegno annuale con fatturazione mensile ricorrente."
                     else:
                         dettaglio_durata = "• Durata Contratto: <b>Mensile rinnovabile</b> senza vincoli pluriennali.<br/>• Condizioni di recesso: Disdicibile con preavviso scritto di almeno 30 giorni."
 
                     story_ord = [
                         Paragraph("<b>MODULO D'ORDINE E CONTRATTO DI ABBONAMENTO SaaS B2B</b>", style_titolo_ord),
                         Paragraph("<b>HydroAegis AI – Piattaforma IA per Ispezioni e Certificazione Forense</b>", style_testo_ord),
-                        Spacer(1, 6),
+                        Spacer(1, 4),
                         Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome}<br/>• P.IVA / C.F.: {cli_piva}<br/>• Email Referente: {cli_email}", style_testo_ord),
                         Spacer(1, 4),
                         Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: <b>{tipo_piano}</b><br/>{dettaglio_durata}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• Canone Imponibile: € {prezzo_mensile:.2f} | IVA (22%): € {iva_mese:.2f}<br/>• <b>TOTALE DOVUTO MENSILE: € {totale_mese_iva:.2f}</b>", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph(f"<b>3. TERMINI DI PAGAMENTO E RISOLUZIONE:</b><br/>• Scadenza: Il <b>{giorno_rinnovo} di ogni mese</b>.<br/>• Metodo: Bonifico bancario anticipato a 5 giorni data fattura.<br/>• <b>Clausola Risolutiva Espressa (Art. 1456 c.c.):</b> Il mancato o ritardato pagamento anche di una sola mensilità comporta la disattivazione immediata della licenza e la risoluzione di diritto del contratto, salvo il diritto al risarcimento.", style_testo_ord),
+                        Paragraph(f"<b>3. TERMINI DI PAGAMENTO, DECORRENZA E RISOLUZIONE:</b><br/>• Scadenza Pagamento: Il <b>{giorno_rinnovo} di ogni mese</b> solare.<br/>• Metodo: Bonifico bancario anticipato a 5 giorni data fattura.<br/>• Decorrenza: A far data dalla ricezione del presente modulo controfirmato e rilascio credenziali.<br/>• <b>Clausola Risolutiva Espressa (Art. 1456 c.c.):</b> Il mancato o ritardato pagamento anche di una sola mensilità comporta la disattivazione immediata della licenza e la risoluzione di diritto del contratto, salvo il diritto al risarcimento.", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph("<b>4. LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce uno strumento di supporto decisionale. La validazione tecnica, la classificazione e la responsabilità della firma del report finale restano ad esclusivo carico del tecnico abilitato del Committente. Il Fornitore è manlevato da ogni responsabilità in merito alle decisioni di cantiere derivanti dall'uso del software.", style_testo_ord),
+                        Paragraph("<b>4. LIMITAZIONE DI RESPONSABILITÀ E MANLEVA (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce esclusivamente uno strumento informatico di supporto decisionale. La validazione tecnica dei dati, la classificazione definitiva alla norma EN 13508-2 e la responsabilità della firma del report finale restano ad esclusivo carico del tecnico abilitato del Committente. Il Fornitore è espressamente manlevato da ogni responsabilità in merito alle decisioni operative di cantiere derivanti dall'uso del software.", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph("<b>5. FORZA MAGGIORE E CONTINUITÀ DEL SERVIZIO (SLA):</b><br/>Il servizio è fornito 'as is' dipendendo da infrastrutture Cloud di terze parti (Google, Supabase). Il Fornitore non è responsabile per disservizi, perdite di dati o ritardi imputabili a cause di forza maggiore, interruzioni di rete o malfunzionamenti delle API fornitrici.", style_testo_ord),
+                        Paragraph("<b>5. FORZA MAGGIORE E CONTINUITÀ DEL SERVIZIO (SLA):</b><br/>Il servizio è fornito 'as is' (così com'è) dipendendo da infrastrutture Cloud di terze parti. Il Fornitore non assume responsabilità per disservizi, perdite di dati o ritardi imputabili a cause di forza maggiore, interruzioni di rete o malfunzionamenti delle API fornitrici.", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph("<b>6. PROPRIETÀ INTELLETTUALE E FORO COMPETENTE:</b><br/>I dati immessi restano di proprietà del Committente e non vengono conservati per l'addestramento di IA pubbliche. Per qualsiasi controversia derivante dal presente contratto sarà competente in via esclusiva il Foro della sede legale del Fornitore.", style_testo_ord),
+                        Paragraph("<b>6. PROPRIETÀ INTELLETTUALE E FORO COMPETENTE:</b><br/>I dati immessi restano di proprietà del Committente (GDPR Reg. UE 2016/679) e non vengono conservati per l'addestramento di IA pubbliche. Per qualsiasi controversia derivante dal presente contratto sarà competente in via esclusiva il Foro della sede legale del Fornitore.", style_testo_ord),
+                        Spacer(1, 10),
+                        Paragraph("<b>Luogo e Data:</b> _________________________ &nbsp;&nbsp;&nbsp;&nbsp; <b>Il Committente (Firma e Timbro):</b> _________________________", style_testo_ord),
                         Spacer(1, 14),
-                        Paragraph("<b>Luogo e Data:</b> _________________________ &nbsp;&nbsp;&nbsp;&nbsp; <b>Il Committente (Firma e Timbro):</b> _________________________", style_testo_ord)
+                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 del Codice Civile, il Committente dichiara di aver letto, compreso e di approvare specificamente e separatamente le seguenti clausole: <b>3</b> (Clausola Risolutiva Espressa), <b>4</b> (Limitazione di Responsabilità e Manleva), <b>5</b> (Forza Maggiore e SLA) e <b>6</b> (Foro Competente).", style_doppia_firma),
+                        Spacer(1, 8),
+                        Paragraph("<b>Il Committente (Seconda Firma Obbligatoria):</b> _________________________", style_testo_ord)
                     ]
                     doc_ord.build(story_ord)
                     
                     with open(ordine_filename, "rb") as f_ord:
                         st.download_button("⬇️ SCARICA IL CONTRATTO B2B COMPILATO", data=f_ord, file_name=ordine_filename, mime="application/pdf")
-                    st.success("✅ Modulo d'Ordine generato! (Clausole legali incluse)")
+                    st.success("✅ Modulo d'Ordine generato con 'Doppia Firma' legale inclusa!")
                 else:
                     st.warning("⚠️ Inserisci almeno la Ragione Sociale e la Partita IVA.")
 
@@ -420,7 +423,6 @@ else:
                                 time.sleep(3)
                                 media_file = genai.get_file(media_file.name)
                         
-                        # --- UPGRADE A GEMINI 1.5 PRO ---
                         model = genai.GenerativeModel(model_name="gemini-1.5-pro")
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
