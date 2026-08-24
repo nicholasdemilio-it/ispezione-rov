@@ -75,7 +75,8 @@ else:
     # --- L'APP VERA E PROPRIA ---
     
     # LA TUA CHIAVE API FISSA E NASCOSTA
-    API_KEY = "INAIzaSyB02fsZD6oWJWpJB1HfPW1zRjIniiIcxts"
+API_KEY =
+st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
     col1, col2 = st.columns([5, 1])
