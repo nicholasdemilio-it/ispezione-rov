@@ -31,7 +31,7 @@ def init_supabase():
 
 supabase: Client = init_supabase()
 
-# Gestione stato Login e Ruoli
+# Gestione stato Login
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'is_admin' not in st.session_state:
@@ -80,17 +80,14 @@ if not st.session_state['logged_in']:
         if btn_accedi or st.session_state['do_login']:
             st.session_state['do_login'] = False
             
-            # 1. ACCESSO SUPER ADMIN (Tu - senza licenza)
             if username == "admin" and password == "Mare2026!":
                 st.session_state['logged_in'] = True
                 st.session_state['is_admin'] = True
                 st.rerun()
                 
-            # 2. ACCESSO CLIENTE (Verifica su Supabase)
             elif username == "cliente1" and password == "Mare2026!":
                 if has_upper and has_num and has_spec:
                     try:
-                        # Controlla la licenza nel database Supabase
                         response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
                         dati = response.data
                         
@@ -101,7 +98,8 @@ if not st.session_state['logged_in']:
                             if licenza_valida:
                                 st.session_state['logged_in'] = True
                                 st.session_state['is_admin'] = False
-                                st.session_state['nome_cliente'] = nome_cliente # Salviamo chi è entrato
+                                st.session_state['nome_cliente'] = nome_cliente
+                                st.session_state['codice_licenza'] = licenza # Salviamo il codice per i controlli futuri
                                 st.rerun()
                             else:
                                 st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
@@ -133,20 +131,33 @@ else:
             st.title("⚙️ Pannello di Controllo (Super Admin)")
             st.write("Qui in futuro appariranno tutti i dati di Supabase in tempo reale.")
         with col2:
-            if st.button("🚪 Esci (Logout)"):
+            if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
                 st.session_state['is_admin'] = False
                 st.rerun()
                 
     # --- VISUALE CLIENTE ---
     else:
+        # 🚨 GUARDIA REALE: CONTROLLO CONTINUO DELLA LICENZA 🚨
+        if 'codice_licenza' in st.session_state:
+            try:
+                check_lic = supabase.table("licenze").select("attiva").eq("codice_licenza", st.session_state['codice_licenza']).execute()
+                if not check_lic.data or not check_lic.data[0].get("attiva", False):
+                    # Se il database dice False, forziamo il logout
+                    st.session_state['logged_in'] = False
+                    if 'report_text' in st.session_state:
+                        del st.session_state['report_text']
+                    st.rerun()
+            except:
+                pass # Evita blocchi se la connessione a Supabase rallenta per un millisecondo
+                
         col1, col2 = st.columns([5, 1])
         with col1:
             st.title("🔍 Piattaforma di Ispezione Automatica")
             cliente = st.session_state.get('nome_cliente', 'Cliente')
             st.success(f"Autenticazione verificata via server. Benvenuto, **{cliente}**.")
         with col2:
-            if st.button("🚪 Esci (Logout)"):
+            if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
                 st.session_state['is_admin'] = False
                 st.rerun()
