@@ -182,7 +182,6 @@ else:
         
         st.markdown("---")
         
-        # 📊 CALCOLATORE DI ROI E PREZZO (STRUMENTO DI VENDITA)
         with st.expander("💼 Simulatore di Prezzo e ROI per Trattativa Commerciale", expanded=False):
             st.write("Usa questo calcolatore durante una chiamata con un cliente per dimostrargli il ritorno economico dell'investimento.")
             
@@ -192,12 +191,9 @@ else:
             with c_r2:
                 costo_orario_tecnico = st.number_input("Costo orario stimato del tecnico (stipendio + oneri):", min_value=15, max_value=100, value=35)
             
-            # Calcoli di stima
-            ore_risparmiate_per_ora_video = 2.5 # Il software fa in 3 min ciò che richiede ore
+            ore_risparmiate_per_ora_video = 2.5
             totale_ore_risparmiate = ore_video_mese * ore_risparmiate_per_ora_video
             risparmio_economico_mensile = totale_ore_risparmiate * costo_orario_tecnico
-            
-            # Prezzo suggerito del software (circa il 25-30% del valore del risparmio)
             prezzo_consigliato = max(290, round(risparmio_economico_mensile * 0.3, -1))
             
             st.markdown(f"""
@@ -224,6 +220,9 @@ else:
                     genera_codice()
                     st.rerun()
             
+            # Qui permettiamo all'admin di impostare il limite report personalizzato per il cliente (es. 50 o 100)
+            limite_impostato = st.number_input("Report mensili inclusi per questo cliente:", min_value=5, max_value=1000, value=50)
+
             btn_crea = st.button("✅ Salva Nuova Licenza", use_container_width=True)
             if btn_crea:
                 if st.session_state['input_cliente'] and st.session_state['input_licenza']:
@@ -231,10 +230,11 @@ else:
                         supabase.table("licenze").insert({
                             "cliente": st.session_state['input_cliente'], 
                             "codice_licenza": st.session_state['input_licenza'], 
-                            "attiva": True
+                            "attiva": True,
+                            "limite_report": limite_impostato
                         }).execute()
                         
-                        st.success(f"✅ Licenza per {st.session_state['input_cliente']} creata con successo!")
+                        st.success(f"✅ Licenza per {st.session_state['input_cliente']} creata con successo ({limite_impostato} report inclusi)!")
                         st.session_state['input_cliente'] = ""
                         st.session_state['input_licenza'] = ""
                         time.sleep(1.2)
@@ -263,7 +263,7 @@ else:
                     <span style="width: 8%;"></span>
                     <span style="width: 32%;">🏢 Cliente</span>
                     <span style="width: 32%;">🔑 Codice Licenza</span>
-                    <span style="width: 28%;">Stato</span>
+                    <span style="width: 28%;">Stato / Limite</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -284,6 +284,7 @@ else:
                                 st.rerun()
                     else:
                         bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
+                        limite_visualizzato = riga.get('limite_report', 50)
                         
                         c_del, c_info, c_act = st.columns([0.4, 4.5, 1])
                         
@@ -294,13 +295,13 @@ else:
                                 st.rerun()
                                 
                         with c_info:
-                            stato_visivo = "🟢 <span style='color: #10b981;'>Attivo</span>" if riga['attiva'] else "🔴 <span style='color: #ef4444;'>Sospeso</span>"
+                            stato_testo = "🟢 Attivo" if riga['attiva'] else "🔴 Sospeso"
                             
                             st.markdown(f"""
                             <div style="background-color: {bg_color}; padding: 14px 15px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between; align-items: center; height: 100%;">
                                 <span style="font-weight: bold; font-size: 16px; width: 35%; color: #f8fafc;">{riga['cliente']}</span>
                                 <span style="font-family: monospace; color: #38bdf8; width: 35%; font-size: 15px;">{riga['codice_licenza']}</span>
-                                <span style="width: 30%; font-weight: bold;">{stato_visivo}</span>
+                                <span style="width: 30%; font-weight: bold; font-size: 13px; color: #94a3b8;">{stato_testo} | Max: {limite_visualizzato} rep.</span>
                             </div>
                             """, unsafe_allow_html=True)
                             
@@ -318,7 +319,7 @@ else:
     else:
         if 'codice_licenza' in st.session_state:
             try:
-                check_lic = supabase.table("licenze").select("attiva").eq("codice_licenza", st.session_state['codice_licenza']).execute()
+                check_lic = supabase.table("licenze").select("*").eq("codice_licenza", st.session_state['codice_licenza']).execute()
                 if not check_lic.data or not check_lic.data[0].get("attiva", False):
                     st.session_state['logged_in'] = False
                     if 'report_text' in st.session_state:
@@ -359,35 +360,41 @@ else:
         """, unsafe_allow_html=True)
 
         if uploaded_file is not None:
-            if st.button("Avvia Analisi con Doppia Verifica"):
-                file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-                with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-                    tmp_file.write(uploaded_file.read())
-                    tmp_file_path = tmp_file.name
-                
-                st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
-                
-                with st.spinner("Caricamento in corso..."):
-                    media_file = genai.upload_file(path=tmp_file_path)
-                    while media_file.state.name == "PROCESSING":
-                        time.sleep(3)
-                        media_file = genai.get_file(media_file.name)
-                
-                model = genai.GenerativeModel(model_name="gemini-3.6-flash")
-                
-                with st.spinner("Fase 1/2: Scansione IA in corso..."):
-                    ruolo = "Sei un Ispettore Offshore. Trova le anomalie nel file ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un tecnico fognario. Trova le anomalie nella tubazione."
-                    bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie con il minuto esatto."]).text
+            max_mb = 200
+            file_size_mb = uploaded_file.size / (1024 * 1024)
+            
+            if file_size_mb > max_mb:
+                st.error(f"🚫 Il file supera la dimensione massima consentita di {max_mb}MB per questo piano. Contatta l'amministratore per sbloccare file più pesanti o passare a un piano superiore.")
+            else:
+                if st.button("Avvia Analisi con Doppia Verifica"):
+                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+                        tmp_file.write(uploaded_file.read())
+                        tmp_file_path = tmp_file.name
+                    
+                    st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
+                    
+                    with st.spinner("Caricamento in corso..."):
+                        media_file = genai.upload_file(path=tmp_file_path)
+                        while media_file.state.name == "PROCESSING":
+                            time.sleep(3)
+                            media_file = genai.get_file(media_file.name)
+                    
+                    model = genai.GenerativeModel(model_name="gemini-3.6-flash")
+                    
+                    with st.spinner("Fase 1/2: Scansione IA in corso..."):
+                        ruolo = "Sei un Ispettore Offshore. Trova le anomalie nel file ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un tecnico fognario. Trova le anomalie nella tubazione."
+                        bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie con il minuto esatto."]).text
 
-                with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI)..."):
-                    prompt_2 = f"""Sei un Supervisore QA esperto di ingegneria civile/offshore. Bozza: {bozza}
-                    1. Scarta i falsi positivi.
-                    2. Applica rigorosamente i codici EN 13508-2.
-                    3. Assegna una Classe di Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza Strutturale / Classe 2 - Manutenzione Programmata / Classe 3 - Monitoraggio).
-                    4. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
-                    5. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
-                    st.session_state['report_text'] = model.generate_content([media_file, prompt_2]).text
-                    os.remove(tmp_file_path)
+                    with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI)..."):
+                        prompt_2 = f"""Sei un Supervisore QA esperto di ingegneria civile/offshore. Bozza: {bozza}
+                        1. Scarta i falsi positivi.
+                        2. Applica rigorosamente i codici EN 13508-2.
+                        3. Assegna una Classe di Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza Strutturale / Classe 2 - Manutenzione Programmata / Classe 3 - Monitoraggio).
+                        4. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
+                        5. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
+                        st.session_state['report_text'] = model.generate_content([media_file, prompt_2]).text
+                        os.remove(tmp_file_path)
 
         if 'report_text' in st.session_state:
             st.success("✅ Doppia verifica completata con successo e classificazione IQI inclusa!")
