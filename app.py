@@ -21,6 +21,7 @@ st.markdown("""
     .stAlert { background-color: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a; color: #e2e8f0; }
     .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+    .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -59,7 +60,7 @@ def genera_codice():
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8; margin-bottom: 40px;'>Inserisci le credenziali. Se sei un cliente, inserisci la tua Licenza.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8; margin-bottom: 30px;'>Inserisci le credenziali. Se sei un cliente, inserisci la tua Licenza.</p>", unsafe_allow_html=True)
     
     col_sx, col_centro, col_dx = st.columns([1, 1.5, 1])
     with col_centro:
@@ -127,13 +128,31 @@ if not st.session_state['logged_in']:
             else:
                 st.error("❌ Credenziali errate.")
     
-    st.write("---")
-    col_testo, _ = st.columns([1, 0.1])
-    with col_testo:
+    # SEZIONE VANTAGGI RIPRISTINATA IN BASSO
+    st.markdown("<br><hr style='border-color: #1e3a8a;'><br>", unsafe_allow_html=True)
+    
+    col_v1, col_v2, col_v3 = st.columns(3)
+    with col_v1:
         st.markdown("""
-        ### 🚀 L'Evoluzione dell'Ispezione Infrastrutturale
-        Questa piattaforma sfrutta un Workflow Agentico ad Intelligenza Artificiale per automatizzare, accelerare e certificare le ispezioni.
-        """)
+        <div class="info-card">
+            <h4>🚀 Automazione Intelligente</h4>
+            <p style="color: #94a3b8; font-size: 14px;">Workflow agentico avanzato per analizzare filmati ROV e fognari azzerando i tempi di revisione manuale.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_v2:
+        st.markdown("""
+        <div class="info-card">
+            <h4>🛡️ Standard EN 13508-2</h4>
+            <p style="color: #94a3b8; font-size: 14px;">Doppia verifica con IA supervisore per scartare falsi positivi e produrre descrizioni tecniche certificate.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_v3:
+        st.markdown("""
+        <div class="info-card">
+            <h4>📄 Certificazione PDF</h4>
+            <p style="color: #94a3b8; font-size: 14px;">Generazione istantanea di report pronti per la consegna ai committenti con un layout professionale.</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 else:
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -179,7 +198,6 @@ else:
                         
                         st.success(f"✅ Licenza per {st.session_state['input_cliente']} creata con successo!")
                         
-                        # Resetta i campi svuotando la memoria di stato
                         st.session_state['input_cliente'] = ""
                         st.session_state['input_licenza'] = ""
                         
