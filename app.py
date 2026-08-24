@@ -104,10 +104,13 @@ if not st.session_state['logged_in']:
         
         if btn_accedi or st.session_state['do_login']:
             st.session_state['do_login'] = False
-            if username == "admin" and password == "Mare2026!":
+            
+            # --- LE TUE NUOVE CREDENZIALI AMMINISTRATORE ---
+            if username == "Hydroadmin45" and password == "Hydremilio.368":
                 st.session_state['logged_in'] = True
                 st.session_state['is_admin'] = True
                 st.rerun()
+                
             elif username == "cliente1" and password == "Mare2026!":
                 if has_upper and has_num and has_spec:
                     try:
