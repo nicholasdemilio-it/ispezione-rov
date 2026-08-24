@@ -230,7 +230,8 @@ else:
                             "cliente": st.session_state['input_cliente'], 
                             "codice_licenza": st.session_state['input_licenza'], 
                             "attiva": True,
-                            "limite_report": limite_impostato
+                            "limite_report": limite_impostato,
+                            "report_consumati": 0
                         }).execute()
                         
                         st.success(f"✅ Licenza per {st.session_state['input_cliente']} creata con successo ({limite_impostato} report inclusi)!")
@@ -262,7 +263,7 @@ else:
                     <span style="width: 8%;"></span>
                     <span style="width: 32%;">🏢 Cliente</span>
                     <span style="width: 32%;">🔑 Codice Licenza</span>
-                    <span style="width: 28%;">Stato / Limite</span>
+                    <span style="width: 28%;">Stato / Utilizzo</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -284,6 +285,7 @@ else:
                     else:
                         bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
                         limite_visualizzato = riga.get('limite_report', 50)
+                        consumati_visualizzati = riga.get('report_consumati', 0)
                         
                         c_del, c_info, c_act = st.columns([0.4, 4.5, 1])
                         
@@ -300,7 +302,7 @@ else:
                             <div style="background-color: {bg_color}; padding: 14px 15px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between; align-items: center; height: 100%;">
                                 <span style="font-weight: bold; font-size: 16px; width: 35%; color: #f8fafc;">{riga['cliente']}</span>
                                 <span style="font-family: monospace; color: #38bdf8; width: 35%; font-size: 15px;">{riga['codice_licenza']}</span>
-                                <span style="width: 30%; font-weight: bold; font-size: 13px; color: #94a3b8;">{stato_testo} | Max: {limite_visualizzato} rep.</span>
+                                <span style="width: 30%; font-weight: bold; font-size: 13px; color: #94a3b8;">{stato_testo} | {consumati_visualizzati}/{limite_visualizzato} rep.</span>
                             </div>
                             """, unsafe_allow_html=True)
                             
@@ -335,8 +337,10 @@ else:
             st.title("🔍 Piattaforma di Ispezione Automatica")
             cliente = st.session_state.get('nome_cliente', 'Cliente')
             limite_totale = dati_cliente_corrente.get('limite_report', 50) if dati_cliente_corrente else 50
-            # Testo di benvenuto con contatore discreto in linea
-            st.markdown(f"Benvenuto, **{cliente}** &nbsp;|&nbsp; <span style='font-size: 13px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);'>📊 Crediti Piano: {limite_totale} Report/mese</span>", unsafe_allow_html=True)
+            report_fatti = dati_cliente_corrente.get('report_consumati', 0) if dati_cliente_corrente else 0
+            
+            # Contatore discreto in linea
+            st.markdown(f"Benvenuto, **{cliente}** &nbsp;|&nbsp; <span style='font-size: 13px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);'>📊 Utilizzo Crediti: {report_fatti} / {limite_totale} Report</span>", unsafe_allow_html=True)
         with col2:
             st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
             if st.button("Esci (Logout)", use_container_width=True):
@@ -372,6 +376,8 @@ else:
             
             if file_size_mb > max_mb:
                 st.error(f"🚫 Il file supera la dimensione massima consentita di {max_mb}MB per questo piano. Contatta l'amministratore per sbloccare file più pesanti o passare a un piano superiore.")
+            elif report_fatti >= limite_totale:
+                st.error(f"🚫 Hai esaurito i report disponibili per questo mese ({report_fatti}/{limite_totale}). Contatta l'amministratore per effettuare l'upgrade del piano o rinnovare i crediti.")
             else:
                 if st.button("Avvia Analisi con Doppia Verifica"):
                     file_ext = os.path.splitext(uploaded_file.name)[1].lower()
@@ -408,6 +414,13 @@ else:
             testo_revisionato = st.text_area("Bozza Certificata", value=st.session_state['report_text'], height=400)
             
             if st.button("Genera PDF Definitivo con Impronta Forense"):
+                # Aggiornamento contatore su Supabase (incrementa di 1 i report consumati)
+                try:
+                    nuovo_consumo = report_fatti + 1
+                    supabase.table("licenze").update({"report_consumati": nuovo_consumo}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
+                except:
+                    pass
+
                 pdf_filename = "Report_Ispezione_Certificato.pdf"
                 doc = SimpleDocTemplate(pdf_filename, pagesize=letter)
                 styles = getSampleStyleSheet()
@@ -418,6 +431,14 @@ else:
                     fontSize=9,
                     leading=11,
                     textColor=colors.HexColor("#475569")
+                )
+                
+                style_legal = ParagraphStyle(
+                    'LegalStyle',
+                    parent=styles['Normal'],
+                    fontSize=8,
+                    leading=10,
+                    textColor=colors.HexColor("#64748b")
                 )
                 
                 story = [
@@ -432,6 +453,12 @@ else:
                 for line in testo_revisionato.split('\n'):
                     if line.strip():
                         story.extend([Paragraph(line, styles['Normal']), Spacer(1, 6)])
+                
+                # Aggiunta della clausola legale di supporto decisionale in calce al PDF
+                story.extend([
+                    Spacer(1, 20),
+                    Paragraph("<b>NOTE LEGALI E LIMITAZIONE DI RESPONSABILITÀ:</b> Il presente report è generato mediante ausilio di sistemi automatici di intelligenza artificiale (HydroAegis AI) a fini di supporto decisionale. La validazione tecnica definitiva, la conformità normativa e la responsabilità della firma del report rimangono ad esclusivo carico del tecnico abilitato dell'azienda committente.", style_legal)
+                ])
                 
                 doc.build(story)
                 with open(pdf_filename, "rb") as pdf_file:
