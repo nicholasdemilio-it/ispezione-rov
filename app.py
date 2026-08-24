@@ -13,13 +13,10 @@ st.set_page_config(page_title="Ispettore IA multi-settore", page_icon="🔍", la
 # --- DESIGN PREMIUM CSS ---
 st.markdown("""
     <style>
-    /* Sfondo principale scuro con sfumatura radiale blu notte */
     .stApp {
         background: radial-gradient(circle at top left, #0b1a30 0%, #050b14 100%);
         color: #f1f5f9;
     }
-    
-    /* Stile pulsanti (Gradient blu/azzurro) */
     div.stButton > button {
         background: linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 100%);
         color: white;
@@ -34,16 +31,12 @@ st.markdown("""
         color: white;
         border: none;
     }
-    
-    /* Aree di testo e input */
     .stTextInput>div>div>input, .stTextArea>div>div>textarea {
         background-color: rgba(15, 23, 42, 0.6);
         color: #e2e8f0;
         border: 1px solid #1e3a8a;
         border-radius: 8px;
     }
-    
-    /* Box delle notifiche (Success/Info) */
     .stAlert {
         background-color: rgba(30, 58, 138, 0.2);
         border: 1px solid #1e3a8a;
@@ -71,12 +64,11 @@ if not st.session_state['logged_in']:
                 st.rerun()
             else:
                 st.error("❌ Credenziali errate. Riprova.")
-            else:
+else:
     # --- L'APP VERA E PROPRIA ---
     
-    # LA TUA CHIAVE API FISSA E NASCOSTA
-API_KEY =
-st.secrets["GEMINI_API_KEY"]
+    # LA TUA CHIAVE API PRELEVATA DALLA CASSAFORTE DI STREAMLIT
+    API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
     col1, col2 = st.columns([5, 1])
@@ -102,7 +94,6 @@ st.secrets["GEMINI_API_KEY"]
                 tmp_file.write(uploaded_file.read())
                 tmp_file_path = tmp_file.name
             
-            # FASE 0: Caricamento
             with st.spinner("Caricamento del video sui server sicuri..."):
                 video_file = genai.upload_file(path=tmp_file_path)
                 while video_file.state.name == "PROCESSING":
@@ -111,7 +102,6 @@ st.secrets["GEMINI_API_KEY"]
             
             model = genai.GenerativeModel(model_name="gemini-3.6-flash")
             
-            # FASE 1: Prima Analisi
             with st.spinner("Fase 1/2: Scansione IA in corso (rilevamento anomalie primarie)..."):
                 if tipo_ispezione == "Tubazione Sottomarina (ROV)":
                     ruolo_1 = "Sei un Ispettore Offshore. Trova tutte le possibili anomalie nel video ROV."
@@ -122,7 +112,6 @@ st.secrets["GEMINI_API_KEY"]
                 risposta_1 = model.generate_content([video_file, prompt_1])
                 bozza_iniziale = risposta_1.text
 
-            # FASE 2: Seconda Analisi
             with st.spinner("Fase 2/2: Supervisore QA al lavoro (eliminazione falsi positivi e codifica EN 13508-2)..."):
                 prompt_2 = f"""
                 Sei un Supervisore di Qualità (QA) Senior per ispezioni di {tipo_ispezione}.
@@ -140,7 +129,6 @@ st.secrets["GEMINI_API_KEY"]
                 
                 os.remove(tmp_file_path)
 
-    # 3. Fase di Revisione
     if 'report_text' in st.session_state:
         st.success("✅ Doppia verifica completata con successo!")
         st.subheader("📝 Fase 3: Approvazione Finale dell'Ispettore")
