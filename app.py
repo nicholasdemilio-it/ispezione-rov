@@ -7,7 +7,7 @@ import random
 import string
 import hashlib
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -71,7 +71,7 @@ def calcola_hash_file(file_path):
     return sha256_hash.hexdigest()
 
 def pulisci_testo_ia(testo_grezzo):
-    """Rimuove simboli grezzi e markdown non professionale trasformandoli in formattazione pulita."""
+    """Rimuove completamente asterischi, cancelletti e simboli indesiderati."""
     testo = re.sub(r'#{1,6}\s*', '', testo_grezzo)
     testo = re.sub(r'\*\*(.*?)\*\*', r'\1', testo)
     testo = re.sub(r'\*(.*?)\*', r'\1', testo)
@@ -195,39 +195,48 @@ else:
         st.markdown("---")
         
         with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B (Per la Vendita)", expanded=False):
-            st.write("Compila i dati dell'azienda acquirente per generare istantaneamente il contratto PDF da inviare via email.")
+            st.write("Compila i dati dell'azienda acquirente per generare istantaneamente il contratto PDF completo di totali, scadenze e termini di pagamento.")
             
             c_ord1, c_ord2 = st.columns(2)
             with c_ord1:
                 cli_nome = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl")
                 cli_piva = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890")
                 cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
+                giorno_rinnovo = st.number_input("Giorno del mese per la scadenza/rinnovo", min_value=1, max_value=31, value=1)
             with c_ord2:
                 tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone mensile agevolato)", "Abbonamento Mensile Flessibile (Senza vincoli)"))
-                prezzo_proposta = st.number_input("Canone Concordato (€ / mese + IVA)", min_value=100, max_value=5000, value=390)
+                prezzo_mensile = st.number_input("Canone Mensile Imponibile (€ + IVA)", min_value=100, max_value=5000, value=390)
                 report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
             
+            # Calcolo automatico IVA (22%) e totale
+            iva_mese = prezzo_mensile * 0.22
+            totale_mese_iva = prezzo_mensile + iva_mese
+
+            st.info(f"💡 **Riepilogo Economico Automatico:** Canone Imponibile: €{prezzo_mensile:.2f} + IVA 22% (€{iva_mese:.2f}) = **Totale da pagare ogni mese: €{totale_mese_iva:.2f} IVA inclusa**")
+
             if st.button("📥 Genera PDF Modulo d'Ordine B2B", use_container_width=True):
                 if cli_nome and cli_piva:
                     ordine_filename = f"Modulo_Ordine_HydroAegis_{cli_nome.replace(' ', '_')}.pdf"
                     doc_ord = SimpleDocTemplate(ordine_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
                     styles_ord = getSampleStyleSheet()
                     
-                    style_titolo_ord = ParagraphStyle('TitleOrd', parent=styles_ord['Heading1'], fontSize=15, leading=18, spaceAfter=10, textColor=colors.HexColor("#0b1a30"))
-                    style_testo_ord = ParagraphStyle('TextOrd', parent=styles_ord['Normal'], fontSize=10, leading=14, spaceAfter=8, textColor=colors.HexColor("#1e293b"))
+                    style_titolo_ord = ParagraphStyle('TitleOrd', parent=styles_ord['Heading1'], fontSize=14, leading=17, spaceAfter=8, textColor=colors.HexColor("#0b1a30"))
+                    style_testo_ord = ParagraphStyle('TextOrd', parent=styles_ord['Normal'], fontSize=9.5, leading=13.5, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
                     
                     story_ord = [
-                        Paragraph("<b>MODULO D'ORDINE E PROPOSTA DI ABBONAMENTO SaaS</b>", style_titolo_ord),
+                        Paragraph("<b>MODULO D'ORDINE E PROPOSTA DI ABBONAMENTO SaaS B2B</b>", style_titolo_ord),
                         Paragraph("<b>HydroAegis AI – Piattaforma di Ispezione Automatica e Certificazione Forense</b>", style_testo_ord),
-                        Spacer(1, 10),
+                        Spacer(1, 6),
                         Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome}<br/>• P.IVA / C.F.: {cli_piva}<br/>• Email Referente: {cli_email}", style_testo_ord),
-                        Spacer(1, 6),
-                        Paragraph(f"<b>2. SELEZIONE DEL PIANO:</b><br/>• Formula Commerciale: {tipo_piano}<br/>• Canone: <b>€ {prezzo_proposta} / mese + IVA</b><br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.", style_testo_ord),
-                        Spacer(1, 6),
-                        Paragraph("<b>3. NOTE LEGALI E LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce uno strumento di supporto decisionale basato su IA. La validazione tecnica definitiva, la conformità alla norma EN 13508-2 e la responsabilità della firma del report rimangono a totale ed esclusivo carico del tecnico abilitato dell'azienda committente.", style_testo_ord),
-                        Spacer(1, 6),
-                        Paragraph("<b>4. PROPRIETÀ INTELLETTUALE E DATI:</b><br/>Il Committente mantiene la piena titolarità dei file caricati. Il Fornitore garantisce l'assenza di memorizzazione permanente o utilizzo dei dati per addestramento di IA pubbliche.", style_testo_ord),
-                        Spacer(1, 20),
+                        Spacer(1, 4),
+                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: {tipo_piano}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• Canone Mensile Imponibile: € {prezzo_mensile:.2f}<br/>• IVA di Legge (22%): € {iva_mese:.2f}<br/>• <b>TOTALE DOVUTO MENSILE (IVA Inclusa): € {totale_mese_iva:.2f}</b>", style_testo_ord),
+                        Spacer(1, 4),
+                        Paragraph(f"<b>3. MODALITÀ E TERMINI DI PAGAMENTO:</b><br/>• Scadenza Pagamento: Il <b>{giorno_rinnovo} di ogni mese</b> solare.<br/>• Metodo di Pagamento: Bonifico bancario anticipato a 5 giorni data fattura.<br/>• Decorrenza Abbonamento: A far data dalla ricezione del presente modulo controfirmato e rilascio delle credenziali di accesso.", style_testo_ord),
+                        Spacer(1, 4),
+                        Paragraph("<b>4. LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce uno strumento di supporto decisionale basato su IA. La validazione tecnica definitiva, la conformità alla norma EN 13508-2 e la responsabilità della firma del report rimangono a totale ed esclusivo carico del tecnico abilitato dell'azienda committente.", style_testo_ord),
+                        Spacer(1, 4),
+                        Paragraph("<b>5. PROPRIETÀ INTELLETTUALE E DATI:</b><br/>Il Committente mantiene la piena titolarità dei file caricati. Il Fornitore garantisce l'assenza di memorizzazione permanente o utilizzo dei dati per addestramento di IA pubbliche.", style_testo_ord),
+                        Spacer(1, 14),
                         Paragraph("<b>Luogo e Data:</b> ___________________________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Firma e Timbro per Accettazione:</b> ___________________________", style_testo_ord)
                     ]
                     doc_ord.build(story_ord)
@@ -459,7 +468,7 @@ else:
                                - RILEVAZIONE ANOMALIE E CODIFICA NORMATIVA
                                - CLASSIFICAZIONE PRIORITÀ D'INTERVENTO (IQI)
                                - VALUTAZIONE STRUTTURALE GENERALE E CONCLUSIONI
-                            5. NON USARE ASTERISCHI, NON USARE CANCELLETTI (#), NON USARE MARKDOWN GREZZO. Usa un linguaggio ingegneristico, formale, schematico e pronto per atti peritali."""
+                            5. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, VIETATO USARE CANCELLETTI (#), VIETATO USARE QUALSIASI SIMBOLO DI MARKDOWN. Scrivi solo testo pulito, formale e ingegneristico."""
                             
                             testo_generato = model.generate_content([media_file, prompt_2]).text
                             st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
@@ -488,7 +497,6 @@ else:
                 )
                 styles = getSampleStyleSheet()
                 
-                # Stili tipografici istituzionali
                 style_header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=16, textColor=colors.HexColor("#0f172a"))
                 style_header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=11, textColor=colors.HexColor("#475569"))
                 style_meta = ParagraphStyle('MetaText', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor("#1e293b"))
@@ -500,7 +508,6 @@ else:
 
                 story = []
 
-                # Intestazione Documentale a Tabella
                 data_odierna = datetime.now().strftime("%d/%m/%Y - %H:%M")
                 header_data = [
                     [
@@ -530,7 +537,6 @@ else:
                 story.append(table_header)
                 story.append(Spacer(1, 10))
 
-                # Box Impronta Forense SHA-256
                 hash_val = st.session_state.get('file_hash', 'N/D')
                 hash_box_data = [[
                     Paragraph("<b>CATENA DI CUSTODIA FORENSE & IMPRONTA DIGITALE DEL FLUSSO VIDEO ORIGINALE</b>", ParagraphStyle('HBoxTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor("#0f172a"))),
@@ -549,7 +555,6 @@ else:
                 story.append(table_hash)
                 story.append(Spacer(1, 12))
 
-                # Elaborazione Corpo del Testo (Senza Asterischi o Simboli Grezzi)
                 testo_pulito = pulisci_testo_ia(testo_revisionato)
                 righe = testo_pulito.split('\n')
 
@@ -559,7 +564,6 @@ else:
                         story.append(Spacer(1, 4))
                         continue
 
-                    # Identificazione Intestazioni di Sezione Principali
                     if riga_strip.isupper() and len(riga_strip) > 4:
                         story.append(Paragraph(riga_strip, style_section_heading))
                         story.append(Spacer(1, 3))
@@ -572,7 +576,6 @@ else:
                     else:
                         story.append(Paragraph(riga_strip, style_body))
 
-                # Note Legali e Limitazione di Responsabilità (Human-in-the-Loop)
                 story.append(Spacer(1, 16))
                 legal_box_data = [[
                     Paragraph("<b>NOTE LEGALI & LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b> Il presente documento è elaborato mediante ausilio di sistemi algoritmici automatici (HydroAegis AI) a fini di supporto decisionale. La validazione peritale definitiva, la congruità normativa rispetto agli standard tecnici e la sottoscrizione formale del fascicolo rimangono a totale ed esclusivo carico del tecnico abilitato dell'azienda committente.", style_legal)
