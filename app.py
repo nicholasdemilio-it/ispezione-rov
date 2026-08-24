@@ -19,6 +19,7 @@ st.markdown("""
     .stAlert { background-color: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a; color: #e2e8f0; }
     .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
+    .admin-card { background-color: rgba(15, 23, 42, 0.8); padding: 15px; border-radius: 10px; border: 1px solid #1e3a8a; margin-bottom: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,7 +100,7 @@ if not st.session_state['logged_in']:
                                 st.session_state['logged_in'] = True
                                 st.session_state['is_admin'] = False
                                 st.session_state['nome_cliente'] = nome_cliente
-                                st.session_state['codice_licenza'] = licenza # Salviamo il codice per i controlli futuri
+                                st.session_state['codice_licenza'] = licenza 
                                 st.rerun()
                             else:
                                 st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
@@ -124,17 +125,83 @@ else:
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
-    # --- VISUALE SUPER ADMIN ---
+    # --- VISUALE SUPER ADMIN (DASHBOARD CRM) ---
     if st.session_state.get('is_admin'):
         col1, col2 = st.columns([5, 1])
         with col1:
-            st.title("⚙️ Pannello di Controllo (Super Admin)")
-            st.write("Qui in futuro appariranno tutti i dati di Supabase in tempo reale.")
+            st.title("⚙️ Pannello di Controllo Direzionale")
+            st.write("Gestisci i tuoi clienti e le licenze attive in tempo reale.")
         with col2:
             if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
                 st.session_state['is_admin'] = False
                 st.rerun()
+        
+        st.markdown("---")
+        
+        # 1. Modulo Creazione Nuova Licenza
+        with st.expander("➕ Aggiungi Nuovo Cliente e Licenza", expanded=False):
+            with st.form("nuova_licenza_form", clear_on_submit=True):
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    nuovo_cliente = st.text_input("Nome Cliente / Azienda")
+                with col_f2:
+                    nuova_licenza = st.text_input("Codice Licenza (es. LIC-MILANO-001)")
+                
+                btn_crea = st.form_submit_button("Genera Licenza")
+                if btn_crea:
+                    if nuovo_cliente and nuova_licenza:
+                        try:
+                            supabase.table("licenze").insert({"cliente": nuovo_cliente, "codice_licenza": nuova_licenza, "attiva": True}).execute()
+                            st.success(f"✅ Licenza per {nuovo_cliente} creata con successo!")
+                            time.sleep(1.5)
+                            st.rerun()
+                        except Exception as e:
+                            st.error("Errore: Impossibile creare la licenza. Verifica che il codice non esista già.")
+                    else:
+                        st.warning("⚠️ Compila entrambi i campi.")
+
+        st.subheader("👥 Database Clienti")
+        
+        # 2. Tabella Lettura e Gestione Licenze
+        try:
+            risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
+            dati_licenze = risposta.data
+            
+            if not dati_licenze:
+                st.info("Nessuna licenza presente nel database.")
+            else:
+                # Intestazioni della tabella
+                col_h1, col_h2, col_h3, col_h4 = st.columns([2, 2, 1, 1])
+                with col_h1: st.markdown("**🏢 Cliente**")
+                with col_h2: st.markdown("**🔑 Codice Licenza**")
+                with col_h3: st.markdown("**Stato**")
+                with col_h4: st.markdown("**Azione**")
+                
+                # Generazione dinamica delle righe
+                for riga in dati_licenze:
+                    st.markdown("<div class='admin-card'>", unsafe_allow_html=True)
+                    c_cli, c_lic, c_stat, c_act = st.columns([2, 2, 1, 1])
+                    
+                    with c_cli:
+                        st.markdown(f"**{riga['cliente']}**")
+                    with c_lic:
+                        st.code(riga['codice_licenza'])
+                    with c_stat:
+                        if riga['attiva']:
+                            st.success("🟢 Attivo")
+                        else:
+                            st.error("🔴 Sospeso")
+                    with c_act:
+                        # Bottone per invertire lo stato
+                        etichetta_bottone = "Sospendi" if riga['attiva'] else "Riattiva"
+                        if st.button(etichetta_bottone, key=f"btn_{riga['codice_licenza']}"):
+                            nuovo_stato = not riga['attiva']
+                            supabase.table("licenze").update({"attiva": nuovo_stato}).eq("codice_licenza", riga['codice_licenza']).execute()
+                            st.rerun() # Ricarica istantaneamente la pagina per mostrare la modifica
+                    st.markdown("</div>", unsafe_allow_html=True)
+        except Exception as e:
+            st.error("Errore di connessione a Supabase durante il caricamento dei clienti.")
                 
     # --- VISUALE CLIENTE ---
     else:
@@ -143,13 +210,12 @@ else:
             try:
                 check_lic = supabase.table("licenze").select("attiva").eq("codice_licenza", st.session_state['codice_licenza']).execute()
                 if not check_lic.data or not check_lic.data[0].get("attiva", False):
-                    # Se il database dice False, forziamo il logout
                     st.session_state['logged_in'] = False
                     if 'report_text' in st.session_state:
                         del st.session_state['report_text']
                     st.rerun()
             except:
-                pass # Evita blocchi se la connessione a Supabase rallenta per un millisecondo
+                pass
                 
         col1, col2 = st.columns([5, 1])
         with col1:
