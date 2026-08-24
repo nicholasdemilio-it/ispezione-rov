@@ -24,7 +24,7 @@ st.markdown("""
     .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
     .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
-    .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; font-size: 14px; color: #cbd5e1; }
+    .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; margin-bottom: 20px; font-size: 14px; color: #cbd5e1; }
     .roi-box { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; margin-top: 15px; }
     </style>
 """, unsafe_allow_html=True)
@@ -339,7 +339,6 @@ else:
             limite_totale = dati_cliente_corrente.get('limite_report', 50) if dati_cliente_corrente else 50
             report_fatti = dati_cliente_corrente.get('report_consumati', 0) if dati_cliente_corrente else 0
             
-            # Contatore discreto in linea
             st.markdown(f"Benvenuto, **{cliente}** &nbsp;|&nbsp; <span style='font-size: 13px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);'>📊 Utilizzo Crediti: {report_fatti} / {limite_totale} Report</span>", unsafe_allow_html=True)
         with col2:
             st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
@@ -351,10 +350,58 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
 
         tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"))
+        
+        # Formati consentiti (Video e Audio multimediali supportati dall'API Gemini)
         formati_accettati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
         
-        uploaded_file = st.file_uploader("Trascina qui il file dell'ispezione", type=formati_accettati)
+        uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati_accettati)
 
+        if uploaded_file is not None:
+            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+            
+            # Blocco preventivo se provano a caricare un PDF o documenti non supportati
+            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']:
+                st.error("🚫 I documenti testuali (PDF, Word, Excel) non possono essere elaborati dal motore video. Carica un file video (es. MP4, MOV) o audio dell'ispezione.")
+            else:
+                max_mb = 200
+                file_size_mb = uploaded_file.size / (1024 * 1024)
+                
+                if file_size_mb > max_mb:
+                    st.error(f"🚫 Il file supera la dimensione massima consentita di {max_mb}MB per questo piano. Contatta l'amministratore per sbloccare file più pesanti o passare a un piano superiore.")
+                elif report_fatti >= limite_totale:
+                    st.error(f"🚫 Hai esaurito i report disponibili per questo mese ({report_fatti}/{limite_totale}). Contatta l'amministratore per effettuare l'upgrade del piano o rinnovare i crediti.")
+                else:
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    if st.button("🚀 Avvia Analisi con Doppia Verifica", use_container_width=True):
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+                            tmp_file.write(uploaded_file.read())
+                            tmp_file_path = tmp_file.name
+                        
+                        st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
+                        
+                        with st.spinner("Caricamento del flusso video in corso..."):
+                            media_file = genai.upload_file(path=tmp_file_path)
+                            while media_file.state.name == "PROCESSING":
+                                time.sleep(3)
+                                media_file = genai.get_file(media_file.name)
+                        
+                        model = genai.GenerativeModel(model_name="gemini-3.6-flash")
+                        
+                        with st.spinner("Fase 1/2: Scansione IA in corso..."):
+                            ruolo = "Sei un Ispettore Offshore. Trova le anomalie nel file ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un tecnico fognario. Trova le anomalie nella tubazione."
+                            bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie con il minuto esatto."]).text
+
+                        with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI)..."):
+                            prompt_2 = f"""Sei un Supervisore QA esperto di ingegneria civile/offshore. Bozza: {bozza}
+                            1. Scarta i falsi positivi.
+                            2. Applica rigorosamente i codici EN 13508-2.
+                            3. Assegna una Classe di Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza Strutturale / Classe 2 - Manutenzione Programmata / Classe 3 - Monitoraggio).
+                            4. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
+                            5. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
+                            st.session_state['report_text'] = model.generate_content([media_file, prompt_2]).text
+                            os.remove(tmp_file_path)
+
+        # --- ISTRUZIONI E PRIVACY SPOSTATE SOTTO IL TASTO DI AVVIO ---
         st.markdown("""
         <div class="privacy-box">
             <h4 style="color: #38bdf8; margin-top: 0;">📌 Istruzioni operative e Garanzia di Privacy</h4>
@@ -370,51 +417,11 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        if uploaded_file is not None:
-            max_mb = 200
-            file_size_mb = uploaded_file.size / (1024 * 1024)
-            
-            if file_size_mb > max_mb:
-                st.error(f"🚫 Il file supera la dimensione massima consentita di {max_mb}MB per questo piano. Contatta l'amministratore per sbloccare file più pesanti o passare a un piano superiore.")
-            elif report_fatti >= limite_totale:
-                st.error(f"🚫 Hai esaurito i report disponibili per questo mese ({report_fatti}/{limite_totale}). Contatta l'amministratore per effettuare l'upgrade del piano o rinnovare i crediti.")
-            else:
-                if st.button("Avvia Analisi con Doppia Verifica"):
-                    file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-                        tmp_file.write(uploaded_file.read())
-                        tmp_file_path = tmp_file.name
-                    
-                    st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
-                    
-                    with st.spinner("Caricamento in corso..."):
-                        media_file = genai.upload_file(path=tmp_file_path)
-                        while media_file.state.name == "PROCESSING":
-                            time.sleep(3)
-                            media_file = genai.get_file(media_file.name)
-                    
-                    model = genai.GenerativeModel(model_name="gemini-3.6-flash")
-                    
-                    with st.spinner("Fase 1/2: Scansione IA in corso..."):
-                        ruolo = "Sei un Ispettore Offshore. Trova le anomalie nel file ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un tecnico fognario. Trova le anomalie nella tubazione."
-                        bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie con il minuto esatto."]).text
-
-                    with st.spinner("Fase 2/2: Supervisore QA al lavoro (Calcolo IQI)..."):
-                        prompt_2 = f"""Sei un Supervisore QA esperto di ingegneria civile/offshore. Bozza: {bozza}
-                        1. Scarta i falsi positivi.
-                        2. Applica rigorosamente i codici EN 13508-2.
-                        3. Assegna una Classe di Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza Strutturale / Classe 2 - Manutenzione Programmata / Classe 3 - Monitoraggio).
-                        4. Scrivi DESCRIZIONI TECNICHE ESTREMAMENTE DETTAGLIATE.
-                        5. Concludi con "VALUTAZIONE STRUTTURALE GENERALE". Solo testo puro."""
-                        st.session_state['report_text'] = model.generate_content([media_file, prompt_2]).text
-                        os.remove(tmp_file_path)
-
         if 'report_text' in st.session_state:
             st.success("✅ Doppia verifica completata con successo e classificazione IQI inclusa!")
             testo_revisionato = st.text_area("Bozza Certificata", value=st.session_state['report_text'], height=400)
             
             if st.button("Genera PDF Definitivo con Impronta Forense"):
-                # Aggiornamento contatore su Supabase (incrementa di 1 i report consumati)
                 try:
                     nuovo_consumo = report_fatti + 1
                     supabase.table("licenze").update({"report_consumati": nuovo_consumo}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
@@ -454,7 +461,6 @@ else:
                     if line.strip():
                         story.extend([Paragraph(line, styles['Normal']), Spacer(1, 6)])
                 
-                # Aggiunta della clausola legale di supporto decisionale in calce al PDF
                 story.extend([
                     Spacer(1, 20),
                     Paragraph("<b>NOTE LEGALI E LIMITAZIONE DI RESPONSABILITÀ:</b> Il presente report è generato mediante ausilio di sistemi automatici di intelligenza artificiale (HydroAegis AI) a fini di supporto decisionale. La validazione tecnica definitiva, la conformità normativa e la responsabilità della firma del report rimangono ad esclusivo carico del tecnico abilitato dell'azienda committente.", style_legal)
