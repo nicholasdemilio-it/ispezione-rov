@@ -40,16 +40,17 @@ if 'is_admin' not in st.session_state:
     st.session_state['is_admin'] = False
 if 'do_login' not in st.session_state:
     st.session_state['do_login'] = False
-if 'codice_generato' not in st.session_state:
-    st.session_state['codice_generato'] = ""
+if 'delete_target' not in st.session_state:
+    st.session_state['delete_target'] = None
+
+# Stati di memoria per i campi di inserimento (per permettere il reset pulito)
+if 'input_cliente' not in st.session_state:
+    st.session_state['input_cliente'] = ""
+if 'input_licenza' not in st.session_state:
+    st.session_state['input_licenza'] = ""
 
 def trigger_login():
     st.session_state['do_login'] = True
-
-def genera_codice():
-    p1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    p2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    st.session_state['codice_generato'] = f"LIC-{p1}-{p2}"
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -143,31 +144,33 @@ else:
             if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
                 st.session_state['is_admin'] = False
+                st.session_state['delete_target'] = False
                 st.rerun()
         
         st.markdown("---")
         
         # 1. Modulo Creazione Nuova Licenza
         with st.expander("➕ Aggiungi Nuovo Cliente e Licenza", expanded=False):
-            col_f1, col_f2, col_f3 = st.columns([2, 2, 1])
-            with col_f1:
-                nuovo_cliente = st.text_input("Nome Cliente / Azienda")
-            with col_f2:
-                nuova_licenza = st.text_input("Codice Licenza", value=st.session_state['codice_generato'])
-            with col_f3:
-                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                if st.button("Genera", use_container_width=True):
-                    genera_codice()
-                    st.rerun()
+            st.session_state['input_cliente'] = st.text_input("Nome Cliente / Azienda", value=st.session_state['input_cliente'])
+            st.session_state['input_licenza'] = st.text_input("Codice Licenza", value=st.session_state['input_licenza'])
             
             btn_crea = st.button("✅ Salva Nuova Licenza", use_container_width=True)
             if btn_crea:
-                if nuovo_cliente and nuova_licenza:
+                if st.session_state['input_cliente'] and st.session_state['input_licenza']:
                     try:
-                        supabase.table("licenze").insert({"cliente": nuovo_cliente, "codice_licenza": nuova_licenza, "attiva": True}).execute()
-                        st.success(f"✅ Licenza per {nuovo_cliente} creata con successo!")
-                        st.session_state['codice_generato'] = "" 
-                        time.sleep(1.5)
+                        supabase.table("licenze").insert({
+                            "cliente": st.session_state['input_cliente'], 
+                            "codice_licenza": st.session_state['input_licenza'], 
+                            "attiva": True
+                        }).execute()
+                        
+                        st.success(f"✅ Licenza per {st.session_state['input_cliente']} creata con successo!")
+                        
+                        # Resetta i campi svuotando la memoria
+                        st.session_state['input_cliente'] = ""
+                        st.session_state['input_licenza'] = ""
+                        
+                        time.sleep(1.2)
                         st.rerun()
                     except Exception as e:
                         st.error("Errore: Impossibile creare la licenza. Verifica che il codice non esista già.")
@@ -175,49 +178,75 @@ else:
                     st.warning("⚠️ Compila entrambi i campi prima di salvare.")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        st.subheader("Database Clienti")
+        
+        # BARRA DI RICERCA
+        st.subheader("👥 Database Clienti")
+        ricerca = st.text_input("🔍 Cerca per nome cliente o codice licenza...", placeholder="Digita qui per filtrare la lista...")
         
         # 2. Tabella Lettura e Gestione Licenze (Stile Zebra)
         try:
             risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
             dati_licenze = risposta.data
             
+            if ricerca:
+                dati_licenze = [d for d in dati_licenze if ricerca.lower() in d['cliente'].lower() or ricerca.lower() in d['codice_licenza'].lower()]
+            
             if not dati_licenze:
-                st.info("Nessuna licenza presente nel database.")
+                st.info("Nessun cliente trovato.")
             else:
-                # Intestazione invisibile e allineata
                 st.markdown("""
-                <div style="display: flex; justify-content: space-between; padding: 0px 15px; margin-bottom: 10px; color: #94a3b8; font-weight: bold; font-size: 14px;">
-                    <span style="width: 35%;">🏢 Cliente</span>
-                    <span style="width: 35%;">🔑 Codice Licenza</span>
-                    <span style="width: 30%;">Stato</span>
+                <div style="display: flex; padding: 0px 15px; margin-bottom: 10px; color: #94a3b8; font-weight: bold; font-size: 14px;">
+                    <span style="width: 8%;"></span>
+                    <span style="width: 32%;">🏢 Cliente</span>
+                    <span style="width: 32%;">🔑 Codice Licenza</span>
+                    <span style="width: 28%;">Stato</span>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 for i, riga in enumerate(dati_licenze):
-                    # Calcolo sfondo alternato (Zebra striping)
-                    bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
-                    
-                    c_info, c_act = st.columns([4.5, 1])
-                    
-                    with c_info:
-                        stato_visivo = "🟢 <span style='color: #10b981;'>Attivo</span>" if riga['attiva'] else "🔴 <span style='color: #ef4444;'>Sospeso</span>"
+                    if st.session_state['delete_target'] == riga['codice_licenza']:
+                        st.warning(f"⚠️ Sei sicuro di voler **eliminare definitivamente** il cliente '{riga['cliente']}'? L'azione è irreversibile.")
+                        col_yes, col_no, _ = st.columns([1, 1, 3])
+                        with col_yes:
+                            if st.button("Sì, Elimina", key=f"yes_{riga['codice_licenza']}", use_container_width=True):
+                                supabase.table("licenze").delete().eq("codice_licenza", riga['codice_licenza']).execute()
+                                st.session_state['delete_target'] = None
+                                st.success("Cliente eliminato.")
+                                time.sleep(1)
+                                st.rerun()
+                        with col_no:
+                            if st.button("Annulla", key=f"no_{riga['codice_licenza']}", use_container_width=True):
+                                st.session_state['delete_target'] = None
+                                st.rerun()
+                    else:
+                        bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
                         
-                        st.markdown(f"""
-                        <div style="background-color: {bg_color}; padding: 14px 15px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between; align-items: center; height: 100%;">
-                            <span style="font-weight: bold; font-size: 16px; width: 35%; color: #f8fafc;">{riga['cliente']}</span>
-                            <span style="font-family: monospace; color: #38bdf8; width: 35%; font-size: 15px;">{riga['codice_licenza']}</span>
-                            <span style="width: 30%; font-weight: bold;">{stato_visivo}</span>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        c_del, c_info, c_act = st.columns([0.4, 4.5, 1])
                         
-                    with c_act:
-                        st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-                        etichetta_bottone = "Sospendi" if riga['attiva'] else "Riattiva"
-                        if st.button(etichetta_bottone, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
-                            nuovo_stato = not riga['attiva']
-                            supabase.table("licenze").update({"attiva": nuovo_stato}).eq("codice_licenza", riga['codice_licenza']).execute()
-                            st.rerun()
+                        with c_del:
+                            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                            if st.button("❌", key=f"del_{riga['codice_licenza']}", help="Elimina cliente"):
+                                st.session_state['delete_target'] = riga['codice_licenza']
+                                st.rerun()
+                                
+                        with c_info:
+                            stato_visivo = "🟢 <span style='color: #10b981;'>Attivo</span>" if riga['attiva'] else "🔴 <span style='color: #ef4444;'>Sospeso</span>"
+                            
+                            st.markdown(f"""
+                            <div style="background-color: {bg_color}; padding: 14px 15px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between; align-items: center; height: 100%;">
+                                <span style="font-weight: bold; font-size: 16px; width: 35%; color: #f8fafc;">{riga['cliente']}</span>
+                                <span style="font-family: monospace; color: #38bdf8; width: 35%; font-size: 15px;">{riga['codice_licenza']}</span>
+                                <span style="width: 30%; font-weight: bold;">{stato_visivo}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                        with c_act:
+                            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                            etichetta_bottone = "Sospendi" if riga['attiva'] else "Riattiva"
+                            if st.button(etichetta_bottone, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
+                                nuovo_stato = not riga['attiva']
+                                supabase.table("licenze").update({"attiva": nuovo_stato}).eq("codice_licenza", riga['codice_licenza']).execute()
+                                st.rerun()
         except Exception as e:
             st.error("Errore di connessione a Supabase durante il caricamento dei clienti.")
                 
