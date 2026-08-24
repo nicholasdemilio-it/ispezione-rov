@@ -12,7 +12,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from supabase import create_client, Client
 
-st.set_page_config(page_title="Ispettore IA multi-settore", page_icon="🔍", layout="wide")
+st.set_page_config(page_title="HydroAegis AI - Ispettore IA", page_icon="🔍", layout="wide")
 
 st.markdown("""
     <style>
@@ -26,7 +26,6 @@ st.markdown("""
     .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
     .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; font-size: 14px; color: #cbd5e1; }
     .roi-box { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; margin-top: 15px; }
-    .usage-card { background: rgba(14, 165, 233, 0.1); border: 1px solid #0ea5e9; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -335,29 +334,17 @@ else:
         with col1:
             st.title("🔍 Piattaforma di Ispezione Automatica")
             cliente = st.session_state.get('nome_cliente', 'Cliente')
-            st.success(f"Autenticazione verificata via server. Benvenuto, **{cliente}**.")
+            limite_totale = dati_cliente_corrente.get('limite_report', 50) if dati_cliente_corrente else 50
+            # Testo di benvenuto con contatore discreto in linea
+            st.markdown(f"Benvenuto, **{cliente}** &nbsp;|&nbsp; <span style='font-size: 13px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);'>📊 Crediti Piano: {limite_totale} Report/mese</span>", unsafe_allow_html=True)
         with col2:
-            if st.button("Esci (Logout)"):
+            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            if st.button("Esci (Logout)", use_container_width=True):
                 st.session_state['logged_in'] = False
                 st.session_state['is_admin'] = False
                 st.rerun()
 
-        # 📊 CONTATORE CREDITI / REPORT RESIDUI PER IL CLIENTE
-        limite_totale = dati_cliente_corrente.get('limite_report', 50) if dati_cliente_corrente else 50
-        # Per ora simuliamo un contatore coerente basato sulla sessione o sul piano
-        st.markdown(f"""
-        <div class="usage-card">
-            <div>
-                <span style="font-size: 15px; font-weight: bold; color: #f8fafc;">📊 Stato Abbonamento e Crediti</span>
-                <p style="margin: 2px 0 0 0; font-size: 13px; color: #94a3b8;">Piano Standard attivo con garanzia di elaborazione sicura.</p>
-            </div>
-            <div style="text-align: right;">
-                <span style="background-color: rgba(14, 165, 233, 0.2); border: 1px solid #0ea5e9; padding: 6px 12px; border-radius: 6px; font-family: monospace; font-weight: bold; color: #38bdf8;">
-                    Limite Mensile: {limite_totale} Report
-                </span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
 
         tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"))
         formati_accettati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
@@ -428,7 +415,7 @@ else:
                 style_forense = ParagraphStyle(
                     'ForenseStyle',
                     parent=styles['Normal'],
-                    fontSize5=9,
+                    fontSize=9,
                     leading=11,
                     textColor=colors.HexColor("#475569")
                 )
