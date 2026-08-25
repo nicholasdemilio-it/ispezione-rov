@@ -445,11 +445,18 @@ else:
                         
                         with st.spinner("Caricamento del flusso multimediale sui server sicuri..."):
                             media_file = genai.upload_file(path=tmp_file_path)
+                            # Aspetta che Google finisca di processare il video
                             while media_file.state.name == "PROCESSING":
                                 time.sleep(3)
                                 media_file = genai.get_file(media_file.name)
+                            
+                            # --- NUOVO CONTROLLO DI SICUREZZA ---
+                            if media_file.state.name == "FAILED":
+                                st.error("🚫 Errore Google: Impossibile elaborare questo file video. Potrebbe essere danneggiato o in un formato non supportato. Prova a ricaricarlo.")
+                                st.stop() # Ferma il programma prima che vada in errore
                         
-                        model = genai.GenerativeModel(model_name="gemini-1.5-pro")
+                        # --- AGGIORNAMENTO NOME MODELLO ---
+                        model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
