@@ -105,7 +105,6 @@ if not st.session_state['logged_in']:
                 else:
                     for tentativo in range(2): 
                         try:
-                            # Cerca la riga esatta con quelle 3 credenziali
                             response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).eq("username", username).eq("password", password).execute()
                             dati = response.data
                             if len(dati) > 0:
@@ -124,7 +123,7 @@ if not st.session_state['logged_in']:
                             break 
                         except Exception as e:
                             if tentativo == 0:
-                                time.sleep(1.5) # DB in cold start
+                                time.sleep(1.5)
                             else:
                                 st.error("Errore di rete: il server di sicurezza è temporaneamente irraggiungibile.")
     
@@ -224,37 +223,33 @@ else:
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        with st.expander("📚 Prontuario Commerciale (Pacchetti Consigliati)", expanded=False):
+        with st.expander("📚 Prontuario Commerciale (Pacchetti Listino)", expanded=False):
             st.markdown("""
-            <p style='color: #94a3b8; font-size: 14px;'>Usa questa tabella di riferimento durante le chiamate di vendita. Il costo di riferimento per un report manuale sprecato dall'azienda è calcolato in circa <b>87€</b> l'uno. <i>Prezzi allineati al mercato SaaS Premium.</i></p>
+            <p style='color: #94a3b8; font-size: 14px;'>Listino ufficiale differenziato tra <b>Impegno Annuale</b> (scontato per fare cassa) e <b>Mensile Flessibile</b> (maggiorato del 25% per disdetta libera).</p>
             <table class="price-table">
                 <tr>
                     <th>Nome Pacchetto</th>
-                    <th>Target Cliente</th>
                     <th>Report Inclusi</th>
-                    <th>Prezzo Mensile (Consigliato)</th>
-                    <th>Risparmio Mensile Cliente</th>
+                    <th>Prezzo Ann. Impegno (al mese)</th>
+                    <th>Prezzo Mensile Flessibile</th>
                 </tr>
                 <tr>
                     <td><b>SMALL</b></td>
-                    <td>Artigiani / Piccoli Autospurghi</td>
                     <td>15 Report / mese</td>
-                    <td><b>290 €</b></td>
-                    <td>~ 1.000 € salvati</td>
+                    <td><b>290 € / mese</b></td>
+                    <td><b>350 € / mese</b></td>
                 </tr>
                 <tr>
                     <td><b>MEDIUM</b></td>
-                    <td>Ingegneria / Medie Aziende Reti</td>
                     <td>50 Report / mese</td>
-                    <td><b>690 €</b></td>
-                    <td>~ 3.600 € salvati</td>
+                    <td><b>690 € / mese</b></td>
+                    <td><b>830 € / mese</b></td>
                 </tr>
                 <tr>
                     <td><b>CORPORATE</b></td>
-                    <td>Multiutility / Grandi Appalti</td>
                     <td>150 Report / mese</td>
-                    <td><b>1.490 €</b></td>
-                    <td>Oltre 11.000 € salvati</td>
+                    <td><b>1.490 € / mese</b></td>
+                    <td><b>1.790 € / mese</b></td>
                 </tr>
             </table>
             """, unsafe_allow_html=True)
@@ -270,8 +265,10 @@ else:
                     cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
                 with c_ord2:
                     tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone agevolato, impegno 12 mesi)", "Abbonamento Mensile Flessibile (Rinnovo automatico)"))
-                    # Aggiornato prezzo di default per riflettere il pacchetto Medium
-                    prezzo_mensile = st.number_input("Canone Netto (€)", min_value=100, max_value=5000, value=690 if "Annuale" in tipo_piano else 790)
+                    
+                    # --- PREZZI DINAMICI IN BASE AL TIPO DI PIANO ---
+                    default_prezzo = 690 if "Annuale" in tipo_piano else 830
+                    prezzo_mensile = st.number_input("Canone Netto Concordato (€)", min_value=100, max_value=5000, value=default_prezzo)
                     report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
                 
                 btn_genera_pdf = st.form_submit_button("⚙️ Prepara Contratto in PDF", use_container_width=True)
@@ -332,7 +329,6 @@ else:
                 clienti_dict = {f"{c['cliente']} ({c['codice_licenza']})": c['codice_licenza'] for c in lista_clienti}
                 scelta_cliente_extra = st.selectbox("Seleziona Azienda Cliente", options=list(clienti_dict.keys()))
                 
-                # --- AGGIORNATA MATEMATICA PREZZI CREDITI EXTRA (Penale Premium per scoraggiare) ---
                 c_ex1, c_ex2 = st.columns(2)
                 with c_ex1: qt_report_extra = st.number_input("Numero Report Extra nel Pacchetto", min_value=5, max_value=200, value=10)
                 with c_ex2: prezzo_pacchetto = st.number_input("Prezzo Totale Pacchetto (€ - Netto)", min_value=50, max_value=2000, value=250)
@@ -365,7 +361,6 @@ else:
         st.markdown("<br>", unsafe_allow_html=True)
         with st.expander("➕ Aggiungi Nuovo Cliente (Attivazione Licenza e Password)", expanded=False):
             
-            # NUOVI CAMPI USERNAME E PASSWORD
             if 'input_cliente' not in st.session_state: st.session_state['input_cliente'] = ""
             st.session_state['input_cliente'] = st.text_input("Ragione Sociale Azienda Cliente", value=st.session_state['input_cliente'])
             
@@ -387,16 +382,18 @@ else:
                     
             col_d1, col_d2, col_d3 = st.columns(3)
             with col_d1: limite_impostato = st.number_input("Report mensili inclusi:", min_value=5, max_value=1000, value=50)
-            with col_d2: frequenza_scelta = st.selectbox("Frequenza Pagamento", ["Mensile", "Annuale"])
-            with col_d3: prezzo_inserito = st.number_input("Prezzo Concordato (€)", min_value=0, max_value=10000, value=690)
+            with col_d2: frequenza_scelta = st.selectbox("Frequenza Pagamento (Nuovo)", ["Mensile Flessibile", "Annuale"])
+            
+            # Prezzo predefinito basato sulla scelta frequenza nel form di creazione
+            def_crea = 830 if frequenza_scelta == "Mensile Flessibile" else 690
+            with col_d3: prezzo_inserito = st.number_input("Prezzo Concordato (€)", min_value=0, max_value=10000, value=def_crea)
 
             if st.button("✅ Salva Nuova Licenza e Credenziali", use_container_width=True):
                 if st.session_state['input_cliente'] and st.session_state['input_licenza_tmp'] and nuovo_username and nuova_password:
                     oggi = datetime.now()
                     str_oggi = oggi.strftime("%d/%m/%Y")
-                    prossimo = (oggi + relativedelta(months=1)).strftime("%d/%m/%Y") if frequenza_scelta == "Mensile" else (oggi + relativedelta(years=1)).strftime("%d/%m/%Y")
+                    prossimo = (oggi + relativedelta(months=1)).strftime("%d/%m/%Y") if "Mensile" in frequenza_scelta else (oggi + relativedelta(years=1)).strftime("%d/%m/%Y")
                     try:
-                        # INSERIMENTO NEL DATABASE CON USERNAME E PASSWORD
                         supabase.table("licenze").insert({
                             "cliente": st.session_state['input_cliente'], 
                             "codice_licenza": st.session_state['input_licenza_tmp'], 
