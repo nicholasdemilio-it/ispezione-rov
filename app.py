@@ -92,24 +92,30 @@ if not st.session_state['logged_in']:
                 st.session_state['is_admin'] = True
                 st.rerun()
             elif username == "cliente1" and password == "Mare2026!":
-                try:
-                    response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
-                    dati = response.data
-                    if len(dati) > 0:
-                        licenza_valida = dati[0].get("attiva", False)
-                        nome_cliente = dati[0].get("cliente", "Sconosciuto")
-                        if licenza_valida:
-                            st.session_state['logged_in'] = True
-                            st.session_state['is_admin'] = False
-                            st.session_state['nome_cliente'] = nome_cliente
-                            st.session_state['codice_licenza'] = licenza 
-                            st.rerun()
+                # Sistema di Auto-Riavvio silenzioso per il Cold Start del Server
+                for tentativo in range(2): 
+                    try:
+                        response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
+                        dati = response.data
+                        if len(dati) > 0:
+                            licenza_valida = dati[0].get("attiva", False)
+                            nome_cliente = dati[0].get("cliente", "Sconosciuto")
+                            if licenza_valida:
+                                st.session_state['logged_in'] = True
+                                st.session_state['is_admin'] = False
+                                st.session_state['nome_cliente'] = nome_cliente
+                                st.session_state['codice_licenza'] = licenza 
+                                st.rerun()
+                            else:
+                                st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
                         else:
-                            st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
-                    else:
-                        st.error("🚫 Codice Licenza inesistente.")
-                except:
-                    st.error("Errore di connessione al database di sicurezza.")
+                            st.error("🚫 Codice Licenza inesistente.")
+                        break # Se ha successo, esce dal ciclo
+                    except Exception as e:
+                        if tentativo == 0:
+                            time.sleep(1.5) # DB in cold start, attende e riprova
+                        else:
+                            st.error("Errore di rete: il server di sicurezza è temporaneamente irraggiungibile. Riprova tra poco.")
             else:
                 st.error("❌ Credenziali errate.")
     
@@ -136,9 +142,7 @@ else:
                 st.rerun()
         st.markdown("---")
 
-        # --- 🛎️ GESTIONE TICKET DI ASSISTENZA (NUOVO) ---
         with st.expander("🛎️ Ticket di Assistenza Clienti", expanded=False):
-            st.write("Qui arrivano le richieste di supporto tecnico e commerciale dai clienti.")
             try:
                 res_tickets = supabase.table("ticket_assistenza").select("*").order("id", desc=True).execute()
                 tickets = res_tickets.data
@@ -178,7 +182,7 @@ else:
                 else:
                     st.info("Nessun ticket di assistenza presente.")
             except Exception as e:
-                st.error(f"⚠️ Errore di connessione: assicurati di aver creato la tabella 'ticket_assistenza' su Supabase. Dettagli: {e}")
+                st.error(f"Nessun ticket (o tabella 'ticket_assistenza' non ancora creata).")
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -443,24 +447,34 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        with st.spinner("Caricamento del flusso multimediale sui server sicuri..."):
-                            media_file = genai.upload_file(path=tmp_file_path)
-                            # Aspetta che Google finisca di processare il video
-                            while media_file.state.name == "PROCESSING":
-                                time.sleep(3)
-                                media_file = genai.get_file(media_file.name)
+                        # --- BLOCCO ANTI-CRASH PER TIMEOUT E ERRORI DI RETE GOOGLE ---
+                        with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
+                            try:
+                                media_file = genai.upload_file(path=tmp_file_path)
+                                
+                                # Attende l'elaborazione di Google
+                                while media_file.state.name == "PROCESSING":
+                                    time.sleep(3)
+                                    media_file = genai.get_file(media_file.name)
+                                
+                                if media_file.state.name == "FAILED":
+                                    st.error("🚫 Errore Google: Impossibile elaborare il file. Potrebbe essere danneggiato o in un formato non supportato.")
+                                    st.stop()
                             
-                            # --- NUOVO CONTROLLO DI SICUREZZA ---
-                            if media_file.state.name == "FAILED":
-                                st.error("🚫 Errore Google: Impossibile elaborare questo file video. Potrebbe essere danneggiato o in un formato non supportato. Prova a ricaricarlo.")
-                                st.stop() # Ferma il programma prima che vada in errore
+                            except Exception as e:
+                                st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
+                                st.stop()
                         
-                        # --- AGGIORNAMENTO NOME MODELLO ---
-                        model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
+                        # Usa il modello standard stabile
+                        model = genai.GenerativeModel(model_name="gemini-1.5-pro")
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
-                            ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
-                            bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
+                            try:
+                                ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
+                                bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
+                            except Exception as e:
+                                st.error("⚠️ Si è verificato un errore durante l'analisi dell'IA. Assicurati che il video non superi i limiti o riprova tra poco.")
+                                st.stop()
 
                         with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
                             prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
@@ -536,13 +550,13 @@ else:
                 with open(pdf_filename, "rb") as pdf_file:
                     st.download_button("📥 SCARICA IL REPORT PDF CERTIFICATO", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
 
-        # --- 1. RISTABILITO IL BOX ISTRUZIONI E PRIVACY ---
+        # --- ISTRUZIONI E PRIVACY ---
         st.markdown("""
         <div class="privacy-box">
             <h4 style="color: #38bdf8; margin-top: 0;">📌 Istruzioni operative e Garanzia di Privacy</h4>
             <ol style="margin-bottom: 12px; padding-left: 20px;">
                 <li><b>Seleziona l'ambiente corretto</b> dal menu a tendina.</li>
-                <li><b>Carica il file multimediale</b> dell'ispezione (puoi caricare file fino a 2GB).</li>
+                <li><b>Carica il file multimediale</b> dell'ispezione.</li>
                 <li><b>Avvia l'analisi</b> e attendi il completamento del workflow dell'Intelligenza Artificiale Pro. <i>(Il credito viene scalato all'avvio dell'elaborazione).</i></li>
             </ol>
             <hr style="border-color: #1e3a8a; margin: 12px 0;">
@@ -552,7 +566,7 @@ else:
         </div>
         """, unsafe_allow_html=True)
 
-        # --- 2. MODULO DI SUPPORTO IN FONDO COLLEGATO A SUPABASE ---
+        # --- MODULO DI SUPPORTO COLLEGATO A SUPABASE ---
         st.markdown("""
         <div class="support-box">
             <h4 style="color: #38bdf8; margin-top: 0;">🛠️ Assistenza Tecnica & Supporto Clienti</h4>
@@ -571,19 +585,10 @@ else:
         if btn_invia_ticket:
             if recapito_utente and descrizione_problema:
                 try:
-                    # Inserisce il ticket nel database di Supabase
-                    supabase.table("ticket_assistenza").insert({
-                        "codice_licenza": st.session_state['codice_licenza'],
-                        "cliente": cliente_nome,
-                        "tipo_problema": tipo_problema,
-                        "preferenza_contatto": preferenza_contatto,
-                        "recapito": recapito_utente,
-                        "descrizione": descrizione_problema,
-                        "stato": "Aperto"
-                    }).execute()
+                    supabase.table("ticket_assistenza").insert({"codice_licenza": st.session_state['codice_licenza'], "cliente": cliente_nome, "tipo_problema": tipo_problema, "preferenza_contatto": preferenza_contatto, "recapito": recapito_utente, "descrizione": descrizione_problema, "stato": "Aperto"}).execute()
                     st.success("✅ Richiesta inviata con successo! Il nostro team tecnico ha preso in carico la segnalazione. Puoi chiudere questa finestra.")
                 except Exception as e:
-                    st.error(f"⚠️ Errore nell'invio della richiesta. Assicurati che l'amministratore abbia configurato il database dei ticket.")
+                    st.error(f"⚠️ Errore nell'invio della richiesta.")
             else:
                 st.warning("⚠️ Compila tutti i campi (recapito e descrizione) prima di inviare la richiesta.")
 
@@ -593,7 +598,7 @@ st.markdown("""
     <div style="border-top: 1px solid #1e3a8a; padding-top: 20px; text-align: center; color: #64748b; font-size: 12px; margin-top: 50px;">
         <b>HydroAegis AI</b> sviluppato da [INSERISCI TUO NOME E COGNOME O NOME AZIENDA] <br>
         Sede Legale: [INSERISCI INDIRIZZO, CITTÀ E CAP] | P.IVA: [INSERISCI LA PARTITA IVA APPENA LA APRI] <br>
-        Contatti: info@tuodominio.it | PEC: tuapec@pec.it <br><br>
+        Contatti: info@hydroaegis.it | PEC: tuapec@pec.it <br><br>
         <a href="#" style="color: #38bdf8; text-decoration: none;">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" style="color: #38bdf8; text-decoration: none;">Termini di Servizio</a>
     </div>
 """, unsafe_allow_html=True)
