@@ -607,7 +607,7 @@ else:
                 style_bullet = ParagraphStyle('Bullet', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=13, leftIndent=12, firstLineIndent=-10, textColor=colors.HexColor("#1e293b"))
                 style_legal = ParagraphStyle('LegalNotice', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=colors.HexColor("#64748b"))
 
-               story = []
+                story = []
                 data_odierna = datetime.now(ZoneInfo("Europe/Rome")).strftime("%d/%m/%Y - %H:%M")
                 table_header = Table([
                     [Paragraph("<b>HYDROAEGIS AI | RAPPORTO TECNICO CERTIFICATO</b>", style_header_title), Paragraph(f"<b>Data Emissione:</b> {data_odierna}", style_meta)],
