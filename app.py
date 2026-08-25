@@ -688,9 +688,9 @@ else:
 st.markdown("""
     <br><br>
     <div style="border-top: 1px solid #1e3a8a; padding-top: 20px; text-align: center; color: #64748b; font-size: 12px; margin-top: 50px;">
-        <b>HydroAegis AI</b> sviluppato da [INSERISCI TUO NOME E COGNOME O NOME AZIENDA] <br>
-        Sede Legale: [INSERISCI INDIRIZZO, CITTÀ E CAP] | P.IVA: [INSERISCI LA PARTITA IVA APPENA LA APRI] <br>
-        Contatti: info@hydroaegis.it | PEC: tuapec@pec.it <br><br>
+        <b>HydroAegis AI</b> sviluppato da HydroAegis <br>
+        Sede Legale: Via Campagna 18,21036 Gemonio (VA) | P.IVA: In fase di attivazione <br>
+        Contatti: info@hydroaegis.it | PEC: hydroaegis@pec.it <br><br>
         <a href="#" style="color: #38bdf8; text-decoration: none;">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" style="color: #38bdf8; text-decoration: none;">Termini di Servizio</a>
     </div>
 """, unsafe_allow_html=True)
