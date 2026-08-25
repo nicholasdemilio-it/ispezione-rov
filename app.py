@@ -441,7 +441,7 @@ else:
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # --- PULSANTE AGGIORNATO (NO EMOJI, NO TESTO GEMINI PRO) ---
+                    # --- PULSANTE "CORPORATE" PULITO ---
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
@@ -449,6 +449,7 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
+                        # --- BLOCCO ANTI-CRASH PER TIMEOUT E ERRORI DI RETE GOOGLE ---
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                             try:
                                 media_file = genai.upload_file(path=tmp_file_path)
@@ -465,8 +466,8 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        # --- MODELLO AGGIORNATO CON L'IDENTIFICATIVO SPECIFICO (Anti-Errore 404) ---
-                        model = genai.GenerativeModel(model_name="gemini-1.5-pro-002")
+                        # --- MODELLO UNIVERSALE FLASH (Anti-Errore 404 e velocissimo) ---
+                        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
@@ -523,7 +524,7 @@ else:
                 data_odierna = datetime.now().strftime("%d/%m/%Y - %H:%M")
                 table_header = Table([
                     [Paragraph("<b>HYDROAEGIS AI | RAPPORTO TECNICO CERTIFICATO</b>", style_header_title), Paragraph(f"<b>Data Emissione:</b> {data_odierna}", style_meta)],
-                    [Paragraph("<b>Standard di Riferimento:</b> EN 13508-2 | Motore Enterprise Pro", style_header_sub), Paragraph(f"<b>Ambiente:</b> {tipo_ispezione}", style_meta)],
+                    [Paragraph("<b>Standard di Riferimento:</b> EN 13508-2 | Motore Enterprise", style_header_sub), Paragraph(f"<b>Ambiente:</b> {tipo_ispezione}", style_meta)],
                     [Paragraph(f"<b>Committente:</b> {cliente_nome}", style_meta), Paragraph("<b>Stato Procedura:</b> Convalidato e Revisionato", style_meta)]
                 ], colWidths=[340, 200])
                 table_header.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")), ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#cbd5e1")), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")), ('PADDING', (0,0), (-1,-1), 6)]))
