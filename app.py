@@ -465,15 +465,17 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        # Usa il modello standard stabile
-                        model = genai.GenerativeModel(model_name="gemini-1.5-pro")
+                       # Usa il modello aggiornato
+                        model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
+                                # Diamo 2 secondi di respiro ai server di Google per trovare il file
+                                time.sleep(2) 
                                 ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
                                 bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
                             except Exception as e:
-                                st.error("⚠️ Si è verificato un errore durante l'analisi dell'IA. Assicurati che il video non superi i limiti o riprova tra poco.")
+                                st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
                                 st.stop()
 
                         with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
