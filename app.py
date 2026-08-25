@@ -691,6 +691,6 @@ st.markdown("""
         <b>HydroAegis AI</b> sviluppato da HydroAegis <br>
         Sede Legale: Via Campagna 18, 21036 Gemonio (VA) | P.IVA: In fase di attivazione <br>
         Contatti: info@hydroaegis.it | PEC: hydroaegis@pec.it <br><br>
-        <a href="#" style="color: #38bdf8; text-decoration: none;">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" style="color: #38bdf8; text-decoration: none;">Termini di Servizio</a>
+        <a href="Privacy_Policy" target="_self" style="color: #38bdf8; text-decoration: none;">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" style="color: #38bdf8; text-decoration: none;">Termini di Servizio</a>
     </div>
 """, unsafe_allow_html=True)
