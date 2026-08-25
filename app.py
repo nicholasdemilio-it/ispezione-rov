@@ -100,7 +100,8 @@ if not st.session_state['logged_in']:
                 st.rerun()
             # ACCESSO CLIENTE DINAMICO (Verifica DB)
             else:
-                if non licenza or not username or not password:
+                # --- QUI È STATO CORRETTO IL "NON" IN "NOT" ---
+                if not licenza or not username or not password:
                     st.warning("⚠️ Compila tutti i campi per accedere.")
                 else:
                     for tentativo in range(2): 
@@ -226,7 +227,7 @@ else:
 
         with st.expander("📚 Prontuario Commerciale (Pacchetti Consigliati)", expanded=False):
             st.markdown("""
-            <p style='color: #94a3b8; font-size: 14px;'>Usa questa tabella di riferimento durante le chiamate di vendita. Il costo di riferimento per un report manuale sprecato dall'azienda è calcolato in circa <b>87€</b> l'uno.</p>
+            <p style='color: #94a3b8; font-size: 14px;'>Usa questa tabella di riferimento durante le chiamate di vendita. Il costo di riferimento per un report manuale sprecato dall'azienda è calcolato in circa <b>87€</b> l'uno. <i>Prezzi allineati al mercato SaaS Premium.</i></p>
             <table class="price-table">
                 <tr>
                     <th>Nome Pacchetto</th>
@@ -239,22 +240,22 @@ else:
                     <td><b>SMALL</b></td>
                     <td>Artigiani / Piccoli Autospurghi</td>
                     <td>15 Report / mese</td>
-                    <td><b>190 €</b></td>
-                    <td>~ 1.100 € salvati</td>
+                    <td><b>290 €</b></td>
+                    <td>~ 1.000 € salvati</td>
                 </tr>
                 <tr>
                     <td><b>MEDIUM</b></td>
                     <td>Ingegneria / Medie Aziende Reti</td>
                     <td>50 Report / mese</td>
-                    <td><b>490 €</b></td>
-                    <td>~ 3.800 € salvati</td>
+                    <td><b>690 €</b></td>
+                    <td>~ 3.600 € salvati</td>
                 </tr>
                 <tr>
                     <td><b>CORPORATE</b></td>
                     <td>Multiutility / Grandi Appalti</td>
                     <td>150 Report / mese</td>
-                    <td><b>990 €</b></td>
-                    <td>Oltre 12.000 € salvati</td>
+                    <td><b>1.490 €</b></td>
+                    <td>Oltre 11.000 € salvati</td>
                 </tr>
             </table>
             """, unsafe_allow_html=True)
@@ -270,7 +271,8 @@ else:
                     cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
                 with c_ord2:
                     tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone agevolato, impegno 12 mesi)", "Abbonamento Mensile Flessibile (Rinnovo automatico)"))
-                    prezzo_mensile = st.number_input("Canone Netto (€)", min_value=100, max_value=5000, value=390 if "Annuale" in tipo_piano else 490)
+                    # Aggiornato prezzo di default per riflettere il pacchetto Medium
+                    prezzo_mensile = st.number_input("Canone Netto (€)", min_value=100, max_value=5000, value=690 if "Annuale" in tipo_piano else 790)
                     report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
                 
                 btn_genera_pdf = st.form_submit_button("⚙️ Prepara Contratto in PDF", use_container_width=True)
@@ -363,6 +365,7 @@ else:
         with st.expander("➕ Aggiungi Nuovo Cliente (Attivazione Licenza e Password)", expanded=False):
             
             # NUOVI CAMPI USERNAME E PASSWORD
+            if 'input_cliente' not in st.session_state: st.session_state['input_cliente'] = ""
             st.session_state['input_cliente'] = st.text_input("Ragione Sociale Azienda Cliente", value=st.session_state['input_cliente'])
             
             c_log1, c_log2 = st.columns(2)
@@ -384,7 +387,7 @@ else:
             col_d1, col_d2, col_d3 = st.columns(3)
             with col_d1: limite_impostato = st.number_input("Report mensili inclusi:", min_value=5, max_value=1000, value=50)
             with col_d2: frequenza_scelta = st.selectbox("Frequenza Pagamento", ["Mensile", "Annuale"])
-            with col_d3: prezzo_inserito = st.number_input("Prezzo Concordato (€)", min_value=0, max_value=10000, value=390)
+            with col_d3: prezzo_inserito = st.number_input("Prezzo Concordato (€)", min_value=0, max_value=10000, value=690)
 
             if st.button("✅ Salva Nuova Licenza e Credenziali", use_container_width=True):
                 if st.session_state['input_cliente'] and st.session_state['input_licenza_tmp'] and nuovo_username and nuova_password:
@@ -545,7 +548,7 @@ else:
                         
                         modello_ideale = None
                         
-                        for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro"]:
+                        for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro", "models/gemini-1.5-flash", "models/gemini-1.5-pro"]:
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
                                 break
