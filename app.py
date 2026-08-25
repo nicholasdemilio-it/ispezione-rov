@@ -121,7 +121,7 @@ if not st.session_state['logged_in']:
     
     st.markdown("<br><hr style='border-color: #1e3a8a;'><br>", unsafe_allow_html=True)
     col_v1, col_v2, col_v3 = st.columns(3)
-    with col_v1: st.markdown("<div class='info-card'><h4>⚡ Motore Enterprise 'Pro'</h4><p style='color: #94a3b8; font-size: 14px;'>Core IA di classe Pro per logiche complesse, classificazione normativa e grammatica peritale.</p></div>", unsafe_allow_html=True)
+    with col_v1: st.markdown("<div class='info-card'><h4>⚡ Motore Enterprise</h4><p style='color: #94a3b8; font-size: 14px;'>Core IA per logiche complesse, classificazione normativa e grammatica peritale.</p></div>", unsafe_allow_html=True)
     with col_v2: st.markdown("<div class='info-card'><h4>🔐 Impronta Crittografica</h4><p style='color: #94a3b8; font-size: 14px;'>Ogni report genera un hash forense univoco a prova di contestazione legale.</p></div>", unsafe_allow_html=True)
     with col_v3: st.markdown("<div class='info-card'><h4>📊 Classificazione IQI</h4><p style='color: #94a3b8; font-size: 14px;'>Calcolo immediato dell'Indice di Priorità d'Intervento strutturale.</p></div>", unsafe_allow_html=True)
 
@@ -440,7 +440,7 @@ else:
                 elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("🚀 Avvia Analisi Enterprise (Gemini Pro)", use_container_width=True):
+                    if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
@@ -465,13 +465,13 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                       # Usa il modello aggiornato
-                        model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
+                        # Usa il modello ufficiale stabile 
+                        model = genai.GenerativeModel(model_name="gemini-1.5-pro")
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
-                                # Diamo 2 secondi di respiro ai server di Google per trovare il file
-                                time.sleep(2) 
+                                # Diamo 2 secondi di respiro ai server per sincronizzare il file caricato
+                                time.sleep(2)
                                 ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
                                 bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
                             except Exception as e:
@@ -479,20 +479,24 @@ else:
                                 st.stop()
 
                         with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
-                            prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
-                            {bozza}
-                            
-                            Fai le seguenti operazioni in UN SINGOLO PASSAGGIO perfetto:
-                            1. Filtra ed elimina i falsi positivi.
-                            2. Assegna a ogni difetto il codice normativo EN 13508-2 pertinente.
-                            3. Calcola l'Indice di Priorità d'Intervento (IQI).
-                            4. Struttura chiaramente in 3 sezioni: RILEVAZIONE ANOMALIE, CLASSIFICAZIONE IQI, VALUTAZIONE STRUTTURALE.
-                            5. CORREZIONE ORTOGRAFICA OBBLIGATORIA.
-                            6. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, CANCELLETTI O MARKDOWN. Scrivi puro testo professionale formattato in paragrafi.
-                            """
-                            testo_generato = model.generate_content([media_file, prompt_2]).text
-                            st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
-                            os.remove(tmp_file_path)
+                            try:
+                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
+                                {bozza}
+                                
+                                Fai le seguenti operazioni in UN SINGOLO PASSAGGIO perfetto:
+                                1. Filtra ed elimina i falsi positivi.
+                                2. Assegna a ogni difetto il codice normativo EN 13508-2 pertinente.
+                                3. Calcola l'Indice di Priorità d'Intervento (IQI).
+                                4. Struttura chiaramente in 3 sezioni: RILEVAZIONE ANOMALIE, CLASSIFICAZIONE IQI, VALUTAZIONE STRUTTURALE.
+                                5. CORREZIONE ORTOGRAFICA OBBLIGATORIA.
+                                6. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, CANCELLETTI O MARKDOWN. Scrivi puro testo professionale formattato in paragrafi.
+                                """
+                                testo_generato = model.generate_content([media_file, prompt_2]).text
+                                st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
+                                os.remove(tmp_file_path)
+                            except Exception as e:
+                                st.error(f"⚠️ Errore durante la fase di certificazione (Fase 2): {e}")
+                                st.stop()
                             
                             # SCALA SUBITO IL CREDITO
                             try:
@@ -559,7 +563,7 @@ else:
             <ol style="margin-bottom: 12px; padding-left: 20px;">
                 <li><b>Seleziona l'ambiente corretto</b> dal menu a tendina.</li>
                 <li><b>Carica il file multimediale</b> dell'ispezione.</li>
-                <li><b>Avvia l'analisi</b> e attendi il completamento del workflow dell'Intelligenza Artificiale Pro. <i>(Il credito viene scalato all'avvio dell'elaborazione).</i></li>
+                <li><b>Avvia l'analisi</b> e attendi il completamento del workflow dell'Intelligenza Artificiale. <i>(Il credito viene scalato all'avvio dell'elaborazione).</i></li>
             </ol>
             <hr style="border-color: #1e3a8a; margin: 12px 0;">
             <p style="margin: 0; font-size: 13px; color: #94a3b8;">
