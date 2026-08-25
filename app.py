@@ -441,7 +441,6 @@ else:
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     
-                    # --- PULSANTE "CORPORATE" PULITO ---
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
@@ -449,7 +448,6 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        # --- BLOCCO ANTI-CRASH PER TIMEOUT E ERRORI DI RETE GOOGLE ---
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                             try:
                                 media_file = genai.upload_file(path=tmp_file_path)
@@ -466,8 +464,26 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        # --- MODELLO UNIVERSALE FLASH (Anti-Errore 404 e velocissimo) ---
-                        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+                        # --- SCANNER AUTOMATICO ANTI-404 ---
+                        # Chiediamo a Google quali modelli sono sbloccati per la tua API
+                        modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        
+                        modello_ideale = None
+                        # Cerca il miglior modello disponibile partendo dai più potenti
+                        for nome in ["models/gemini-1.5-pro", "models/gemini-1.5-flash", "models/gemini-1.5-pro-latest", "models/gemini-pro"]:
+                            if nome in modelli_disponibili:
+                                modello_ideale = nome
+                                break
+                                
+                        # Fallback di sicurezza: se non trova i preferiti, prende il primo video-capace che Google ci offre
+                        if not modello_ideale and len(modelli_disponibili) > 0:
+                            modello_ideale = modelli_disponibili[0]
+                        
+                        if not modello_ideale:
+                            st.error("⚠️ Nessun modello compatibile trovato per questa chiave API.")
+                            st.stop()
+                            
+                        model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
