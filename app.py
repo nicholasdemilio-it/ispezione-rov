@@ -17,15 +17,19 @@ from supabase import create_client, Client
 
 st.set_page_config(page_title="HydroAegis AI - Ispettore IA", page_icon="🔍", layout="wide")
 
+# --- SCUDO CSS PER NASCONDERE STREAMLIT E ABBELLIRE LA UI ---
 st.markdown("""
     <style>
+    /* Nasconde il menu e il footer di Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
     .stApp { background: radial-gradient(circle at top left, #0b1a30 0%, #050b14 100%); color: #f1f5f9; }
     div.stButton > button { background: linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 100%); color: white; border: none; border-radius: 8px; font-weight: 600; transition: all 0.3s ease; }
     div.stButton > button:hover { box-shadow: 0 0 15px rgba(14, 165, 233, 0.6); transform: translateY(-2px); color: white; border: none; }
     .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div { background-color: rgba(15, 23, 42, 0.6); color: #e2e8f0; border: 1px solid #1e3a8a; border-radius: 8px; }
     .stAlert { background-color: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a; color: #e2e8f0; }
-    .req-box { font-size: 13px; margin-top: 5px; margin-bottom: 15px; padding: 10px; background-color: rgba(0,0,0,0.2); border-radius: 5px;}
-    details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
     .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
     .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; margin-bottom: 20px; font-size: 14px; color: #cbd5e1; }
     .support-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #38bdf8; padding: 20px; border-radius: 12px; margin-top: 30px; margin-bottom: 20px; }
@@ -34,6 +38,9 @@ st.markdown("""
     .client-suspended { border-left: 4px solid #ef4444; opacity: 0.8; }
     .ticket-row { background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 10px; }
     .ticket-resolved { border-left: 4px solid #10b981; opacity: 0.7; }
+    .price-table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #e2e8f0; font-size: 14px;}
+    .price-table th { background-color: #1e3a8a; padding: 10px; border: 1px solid #0f172a; }
+    .price-table td { background-color: rgba(15, 23, 42, 0.6); padding: 10px; border: 1px solid #0f172a; text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -47,15 +54,13 @@ if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if 'is_admin' not in st.session_state: st.session_state['is_admin'] = False
 if 'do_login' not in st.session_state: st.session_state['do_login'] = False
 if 'delete_target' not in st.session_state: st.session_state['delete_target'] = None
-if 'input_cliente' not in st.session_state: st.session_state['input_cliente'] = ""
-if 'input_licenza' not in st.session_state: st.session_state['input_licenza'] = ""
 
 def trigger_login(): st.session_state['do_login'] = True
 
 def genera_codice():
     p1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
     p2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    st.session_state['input_licenza'] = f"LIC-{p1}-{p2}"
+    return f"LIC-{p1}-{p2}"
 
 def calcola_hash_file(file_path):
     sha256_hash = hashlib.sha256()
@@ -75,11 +80,11 @@ def pulisci_testo_ia(testo_grezzo):
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8; margin-bottom: 30px;'>Inserisci le credenziali. Se sei un cliente, inserisci la tua Licenza.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #94a3b8; margin-bottom: 30px;'>Inserisci le tue credenziali e il Codice Licenza fornito dall'amministratore.</p>", unsafe_allow_html=True)
     
     col_sx, col_centro, col_dx = st.columns([1, 1.5, 1])
     with col_centro:
-        licenza = st.text_input("Codice Licenza Aziendale (Clienti)", type="password", placeholder="Es: LIC-ROV-...")
+        licenza = st.text_input("Codice Licenza Aziendale", placeholder="Es: LIC-ABCD-1234")
         username = st.text_input("Nome Utente")
         password = st.text_input("Password", type="password", on_change=trigger_login)
         
@@ -87,36 +92,41 @@ if not st.session_state['logged_in']:
         
         if btn_accedi or st.session_state['do_login']:
             st.session_state['do_login'] = False
+            
+            # ACCESSO ADMIN
             if username == "Hydroadmin45" and password == "Hydremilio.368":
                 st.session_state['logged_in'] = True
                 st.session_state['is_admin'] = True
                 st.rerun()
-            elif username == "cliente1" and password == "Mare2026!":
-                for tentativo in range(2): 
-                    try:
-                        response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
-                        dati = response.data
-                        if len(dati) > 0:
-                            licenza_valida = dati[0].get("attiva", False)
-                            nome_cliente = dati[0].get("cliente", "Sconosciuto")
-                            if licenza_valida:
-                                st.session_state['logged_in'] = True
-                                st.session_state['is_admin'] = False
-                                st.session_state['nome_cliente'] = nome_cliente
-                                st.session_state['codice_licenza'] = licenza 
-                                st.rerun()
-                            else:
-                                st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
-                        else:
-                            st.error("🚫 Codice Licenza inesistente.")
-                        break
-                    except Exception as e:
-                        if tentativo == 0:
-                            time.sleep(1.5)
-                        else:
-                            st.error("Errore di rete: il server di sicurezza è temporaneamente irraggiungibile. Riprova tra poco.")
+            # ACCESSO CLIENTE DINAMICO (Verifica DB)
             else:
-                st.error("❌ Credenziali errate.")
+                if non licenza or not username or not password:
+                    st.warning("⚠️ Compila tutti i campi per accedere.")
+                else:
+                    for tentativo in range(2): 
+                        try:
+                            # Cerca la riga esatta con quelle 3 credenziali
+                            response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).eq("username", username).eq("password", password).execute()
+                            dati = response.data
+                            if len(dati) > 0:
+                                licenza_valida = dati[0].get("attiva", False)
+                                nome_cliente = dati[0].get("cliente", "Sconosciuto")
+                                if licenza_valida:
+                                    st.session_state['logged_in'] = True
+                                    st.session_state['is_admin'] = False
+                                    st.session_state['nome_cliente'] = nome_cliente
+                                    st.session_state['codice_licenza'] = licenza 
+                                    st.rerun()
+                                else:
+                                    st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA dall'amministrazione.")
+                            else:
+                                st.error("❌ Credenziali errate o Licenza non valida.")
+                            break 
+                        except Exception as e:
+                            if tentativo == 0:
+                                time.sleep(1.5) # DB in cold start
+                            else:
+                                st.error("Errore di rete: il server di sicurezza è temporaneamente irraggiungibile.")
     
     st.markdown("<br><hr style='border-color: #1e3a8a;'><br>", unsafe_allow_html=True)
     col_v1, col_v2, col_v3 = st.columns(3)
@@ -128,6 +138,7 @@ else:
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
+    # --- VISUALE SUPER ADMIN ---
     if st.session_state.get('is_admin'):
         col1, col2 = st.columns([5, 1])
         with col1:
@@ -209,6 +220,43 @@ else:
                     <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Proiezione su 12 mesi</p>
                 </div>
             </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        with st.expander("📚 Prontuario Commerciale (Pacchetti Consigliati)", expanded=False):
+            st.markdown("""
+            <p style='color: #94a3b8; font-size: 14px;'>Usa questa tabella di riferimento durante le chiamate di vendita. Il costo di riferimento per un report manuale sprecato dall'azienda è calcolato in circa <b>87€</b> l'uno.</p>
+            <table class="price-table">
+                <tr>
+                    <th>Nome Pacchetto</th>
+                    <th>Target Cliente</th>
+                    <th>Report Inclusi</th>
+                    <th>Prezzo Mensile (Consigliato)</th>
+                    <th>Risparmio Mensile Cliente</th>
+                </tr>
+                <tr>
+                    <td><b>SMALL</b></td>
+                    <td>Artigiani / Piccoli Autospurghi</td>
+                    <td>15 Report / mese</td>
+                    <td><b>190 €</b></td>
+                    <td>~ 1.100 € salvati</td>
+                </tr>
+                <tr>
+                    <td><b>MEDIUM</b></td>
+                    <td>Ingegneria / Medie Aziende Reti</td>
+                    <td>50 Report / mese</td>
+                    <td><b>490 €</b></td>
+                    <td>~ 3.800 € salvati</td>
+                </tr>
+                <tr>
+                    <td><b>CORPORATE</b></td>
+                    <td>Multiutility / Grandi Appalti</td>
+                    <td>150 Report / mese</td>
+                    <td><b>990 €</b></td>
+                    <td>Oltre 12.000 € salvati</td>
+                </tr>
+            </table>
             """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -312,34 +360,61 @@ else:
             """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("➕ Aggiungi Nuovo Cliente (Attivazione Licenza)", expanded=False):
-            st.session_state['input_cliente'] = st.text_input("Nome Cliente / Azienda", value=st.session_state['input_cliente'])
+        with st.expander("➕ Aggiungi Nuovo Cliente (Attivazione Licenza e Password)", expanded=False):
+            
+            # NUOVI CAMPI USERNAME E PASSWORD
+            st.session_state['input_cliente'] = st.text_input("Ragione Sociale Azienda Cliente", value=st.session_state['input_cliente'])
+            
+            c_log1, c_log2 = st.columns(2)
+            with c_log1:
+                nuovo_username = st.text_input("Username per il Cliente (Es. idrica_srl)", placeholder="Nessuno spazio")
+            with c_log2:
+                nuova_password = st.text_input("Password per il Cliente", placeholder="Inserisci una password sicura")
+            
             col_l1, col_l2 = st.columns([3, 1])
-            with col_l1: st.session_state['input_licenza'] = st.text_input("Codice Licenza", value=st.session_state['input_licenza'])
+            with col_l1: 
+                if 'input_licenza_tmp' not in st.session_state: st.session_state['input_licenza_tmp'] = ""
+                st.session_state['input_licenza_tmp'] = st.text_input("Codice Licenza Generato", value=st.session_state['input_licenza_tmp'])
             with col_l2:
                 st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
                 if st.button("Genera Codice", use_container_width=True):
-                    genera_codice()
+                    st.session_state['input_licenza_tmp'] = genera_codice()
                     st.rerun()
+                    
             col_d1, col_d2, col_d3 = st.columns(3)
             with col_d1: limite_impostato = st.number_input("Report mensili inclusi:", min_value=5, max_value=1000, value=50)
             with col_d2: frequenza_scelta = st.selectbox("Frequenza Pagamento", ["Mensile", "Annuale"])
             with col_d3: prezzo_inserito = st.number_input("Prezzo Concordato (€)", min_value=0, max_value=10000, value=390)
 
-            if st.button("✅ Salva Nuova Licenza e Avvia Ciclo Pagamenti", use_container_width=True):
-                if st.session_state['input_cliente'] and st.session_state['input_licenza']:
+            if st.button("✅ Salva Nuova Licenza e Credenziali", use_container_width=True):
+                if st.session_state['input_cliente'] and st.session_state['input_licenza_tmp'] and nuovo_username and nuova_password:
                     oggi = datetime.now()
                     str_oggi = oggi.strftime("%d/%m/%Y")
                     prossimo = (oggi + relativedelta(months=1)).strftime("%d/%m/%Y") if frequenza_scelta == "Mensile" else (oggi + relativedelta(years=1)).strftime("%d/%m/%Y")
                     try:
-                        supabase.table("licenze").insert({"cliente": st.session_state['input_cliente'], "codice_licenza": st.session_state['input_licenza'], "attiva": True, "limite_report": limite_impostato, "report_consumati": 0, "prezzo": prezzo_inserito, "frequenza": frequenza_scelta, "ultimo_pagamento": str_oggi, "prossimo_rinnovo": prossimo}).execute()
-                        st.success("✅ Licenza creata! Ciclo di fatturazione avviato.")
+                        # INSERIMENTO NEL DATABASE CON USERNAME E PASSWORD
+                        supabase.table("licenze").insert({
+                            "cliente": st.session_state['input_cliente'], 
+                            "codice_licenza": st.session_state['input_licenza_tmp'], 
+                            "username": nuovo_username,
+                            "password": nuova_password,
+                            "attiva": True, 
+                            "limite_report": limite_impostato, 
+                            "report_consumati": 0, 
+                            "prezzo": prezzo_inserito, 
+                            "frequenza": frequenza_scelta, 
+                            "ultimo_pagamento": str_oggi, 
+                            "prossimo_rinnovo": prossimo
+                        }).execute()
+                        st.success("✅ Cliente creato con successo! Manda al cliente Username, Password e Codice Licenza.")
                         st.session_state['input_cliente'] = ""
-                        st.session_state['input_licenza'] = ""
-                        time.sleep(1.5)
+                        st.session_state['input_licenza_tmp'] = ""
+                        time.sleep(2)
                         st.rerun()
-                    except Exception as e: st.error(f"Errore DB: {e}")
-                else: st.warning("⚠️ Compila nome e codice licenza.")
+                    except Exception as e: 
+                        st.error(f"Errore DB: {e}. (Assicurati di aver aggiunto le colonne 'username' e 'password' su Supabase come ti ha detto l'IA!).")
+                else: 
+                    st.warning("⚠️ Compila tutti i campi: Ragione Sociale, Username, Password e Codice Licenza.")
 
         st.markdown("<br>", unsafe_allow_html=True)
         with st.expander("👥 Database Clienti e Pagamenti (Riservato)", expanded=False):
@@ -379,8 +454,8 @@ else:
                                         <span style="font-family: monospace; color: #94a3b8;">{riga['codice_licenza']}</span>
                                     </div>
                                     <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1;">
+                                        <span><b>User/Pass:</b> {riga.get('username','N/D')} / {riga.get('password','N/D')}</span>
                                         <span><b>Report:</b> {riga.get('report_consumati',0)}/{riga.get('limite_report',50)}</span>
-                                        <span><b>Ultimo Pag:</b> {riga.get('ultimo_pagamento','N/D')}</span>
                                         <span style="color: {'#10b981' if riga['attiva'] else '#ef4444'};"><b>Prox Rinnovo:</b> {riga.get('prossimo_rinnovo','N/D')}</span>
                                     </div>
                                 </div>
