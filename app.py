@@ -100,7 +100,6 @@ if not st.session_state['logged_in']:
                 st.rerun()
             # ACCESSO CLIENTE DINAMICO (Verifica DB)
             else:
-                # --- QUI È STATO CORRETTO IL "NON" IN "NOT" ---
                 if not licenza or not username or not password:
                     st.warning("⚠️ Compila tutti i campi per accedere.")
                 else:
@@ -332,9 +331,11 @@ else:
             if lista_clienti:
                 clienti_dict = {f"{c['cliente']} ({c['codice_licenza']})": c['codice_licenza'] for c in lista_clienti}
                 scelta_cliente_extra = st.selectbox("Seleziona Azienda Cliente", options=list(clienti_dict.keys()))
+                
+                # --- AGGIORNATA MATEMATICA PREZZI CREDITI EXTRA (Penale Premium per scoraggiare) ---
                 c_ex1, c_ex2 = st.columns(2)
-                with c_ex1: qt_report_extra = st.number_input("Numero Report Extra nel Pacchetto", min_value=5, max_value=200, value=20)
-                with c_ex2: prezzo_pacchetto = st.number_input("Prezzo Totale Pacchetto (€ - Netto)", min_value=50, max_value=2000, value=150)
+                with c_ex1: qt_report_extra = st.number_input("Numero Report Extra nel Pacchetto", min_value=5, max_value=200, value=10)
+                with c_ex2: prezzo_pacchetto = st.number_input("Prezzo Totale Pacchetto (€ - Netto)", min_value=50, max_value=2000, value=250)
                 
                 if st.button("⚡ Aggiungi Report al Cliente", use_container_width=True):
                     cod_selezionato = clienti_dict[scelta_cliente_extra]
@@ -415,7 +416,7 @@ else:
                         time.sleep(2)
                         st.rerun()
                     except Exception as e: 
-                        st.error(f"Errore DB: {e}. (Assicurati di aver aggiunto le colonne 'username' e 'password' su Supabase come ti ha detto l'IA!).")
+                        st.error(f"Errore DB: {e}. (Assicurati di aver aggiunto le colonne 'username' e 'password' su Supabase).")
                 else: 
                     st.warning("⚠️ Compila tutti i campi: Ragione Sociale, Username, Password e Codice Licenza.")
 
