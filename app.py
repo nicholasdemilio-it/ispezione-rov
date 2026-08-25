@@ -440,6 +440,8 @@ else:
                 elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # --- PULSANTE AGGIORNATO (NO EMOJI, NO TESTO GEMINI PRO) ---
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
@@ -447,12 +449,10 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        # --- BLOCCO ANTI-CRASH PER TIMEOUT E ERRORI DI RETE GOOGLE ---
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                             try:
                                 media_file = genai.upload_file(path=tmp_file_path)
                                 
-                                # Attende l'elaborazione di Google
                                 while media_file.state.name == "PROCESSING":
                                     time.sleep(3)
                                     media_file = genai.get_file(media_file.name)
@@ -465,13 +465,12 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        # Usa il modello ufficiale stabile 
-                        model = genai.GenerativeModel(model_name="gemini-1.5-pro")
+                        # --- MODELLO AGGIORNATO CON L'IDENTIFICATIVO SPECIFICO (Anti-Errore 404) ---
+                        model = genai.GenerativeModel(model_name="gemini-1.5-pro-002")
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
-                                # Diamo 2 secondi di respiro ai server per sincronizzare il file caricato
-                                time.sleep(2)
+                                time.sleep(2) # Respiro per la sincronizzazione file sui server
                                 ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
                                 bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
                             except Exception as e:
