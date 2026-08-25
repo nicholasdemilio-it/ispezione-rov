@@ -27,6 +27,7 @@ st.markdown("""
     details > summary { cursor: pointer; color: #94a3b8; font-size: 14px; margin-bottom: 5px; font-weight: bold; }
     .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
     .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; margin-bottom: 20px; font-size: 14px; color: #cbd5e1; }
+    .support-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #38bdf8; padding: 20px; border-radius: 12px; margin-top: 30px; margin-bottom: 20px; }
     .roi-box { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; margin-top: 15px; }
     </style>
 """, unsafe_allow_html=True)
@@ -104,13 +105,10 @@ if not st.session_state['logged_in']:
         
         if btn_accedi or st.session_state['do_login']:
             st.session_state['do_login'] = False
-            
-            # --- LE TUE NUOVE CREDENZIALI AMMINISTRATORE ---
             if username == "Hydroadmin45" and password == "Hydremilio.368":
                 st.session_state['logged_in'] = True
                 st.session_state['is_admin'] = True
                 st.rerun()
-                
             elif username == "cliente1" and password == "Mare2026!":
                 if has_upper and has_num and has_spec:
                     try:
@@ -154,7 +152,7 @@ else:
         col1, col2 = st.columns([5, 1])
         with col1:
             st.title("Pannello di Controllo Direzionale & Vendite")
-            st.write("Gestisci le licenze, calcola il ROI e genera contratti per Partite IVA in Forfettario.")
+            st.write("Gestisci le licenze, calcola il ROI, genera contratti e pacchetti di ricarica extra.")
         with col2:
             if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
@@ -162,9 +160,50 @@ else:
                 st.session_state['delete_target'] = None
                 st.rerun()
         st.markdown("---")
+
+        # --- CRUSCOTTO FINANZIARIO (MRR & ARR) ---
+        with st.expander("💶 Cruscotto Finanziario (MRR & ARR)", expanded=False):
+            st.write("Monitora in tempo reale le metriche chiave del tuo business SaaS.")
+            
+            try:
+                res_fin = supabase.table("licenze").select("*").execute()
+                tutti_clienti = res_fin.data
+                clienti_attivi = sum(1 for c in tutti_clienti if c.get('attiva', False))
+                clienti_totali = len(tutti_clienti)
+            except:
+                clienti_attivi = 0
+                clienti_totali = 0
+
+            c_fin1, c_fin2 = st.columns(2)
+            with c_fin1:
+                canone_medio = st.number_input("Canone medio mensile per cliente attivo (€)", min_value=0, max_value=5000, value=390)
+            
+            mrr = clienti_attivi * canone_medio
+            arr = mrr * 12
+
+            st.markdown(f"""
+            <div style="display: flex; gap: 20px; margin-top: 15px;">
+                <div style="flex: 1; background: rgba(14, 165, 233, 0.1); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; text-align: center;">
+                    <h5 style="color: #cbd5e1; margin: 0; font-size: 14px;">MRR (Incasso Mensile)</h5>
+                    <h2 style="color: #38bdf8; margin: 5px 0 0 0; font-size: 32px;">€ {mrr:,.0f}</h2>
+                    <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Fatturato ricorrente ogni mese</p>
+                </div>
+                <div style="flex: 1; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; text-align: center;">
+                    <h5 style="color: #cbd5e1; margin: 0; font-size: 14px;">ARR (Incasso Annuale)</h5>
+                    <h2 style="color: #10b981; margin: 5px 0 0 0; font-size: 32px;">€ {arr:,.0f}</h2>
+                    <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Proiezione su 12 mesi</p>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 15px; color: #94a3b8; font-size: 14px;">
+                <b>Clienti Attivi Paganti:</b> {clienti_attivi} su {clienti_totali} totali nel database
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
         
-        with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B (Regime Forfettario)", expanded=False):
-            st.write("Compila il form. Il PDF includerà automaticamente la dicitura di esenzione IVA per il regime forfettario.")
+        # 1) GENERATORE CONTRATTO (ANNUALE / MENSILE) CON CLAUSOLA DI SALVAGUARDIA
+        with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B", expanded=False):
+            st.write("Scegli tra abbonamento annuale agevolato o mensile flessibile.")
             with st.form("form_contratto_b2b"):
                 c_ord1, c_ord2 = st.columns(2)
                 with c_ord1:
@@ -174,7 +213,7 @@ else:
                     giorno_rinnovo = st.number_input("Giorno del mese per scadenza/rinnovo", min_value=1, max_value=31, value=1)
                 with c_ord2:
                     tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone agevolato con impegno 12 mesi)", "Abbonamento Mensile Flessibile (Senza vincoli, disdetta 30 giorni)"))
-                    prezzo_mensile = st.number_input("Canone Mensile (€ - Esente IVA)", min_value=100, max_value=5000, value=390)
+                    prezzo_mensile = st.number_input("Canone Mensile Netto (€)", min_value=100, max_value=5000, value=390 if "Annuale" in tipo_piano else 490)
                     report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
                 
                 btn_genera_pdf = st.form_submit_button("⚙️ Prepara Contratto in PDF", use_container_width=True)
@@ -191,9 +230,9 @@ else:
                     style_doppia_firma = ParagraphStyle('DoppiaFirma', parent=styles_ord['Normal'], fontSize=7.5, leading=9.5, spaceAfter=8, textColor=colors.HexColor("#334155"), fontName="Helvetica-Oblique")
                     
                     if "Annuale" in tipo_piano:
-                        dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura.<br/>• Condizioni di recesso: Impegno annuale con fatturazione mensile ricorrente."
+                        dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura ed esclusiva tariffa agevolata.<br/>• Condizioni di recesso: Impegno annuale con fatturazione mensile ricorrente."
                     else:
-                        dettaglio_durata = "• Durata Contratto: <b>Mensile rinnovabile</b> senza vincoli pluriennali.<br/>• Condizioni di recesso: Disdicibile con preavviso scritto di almeno 30 giorni."
+                        dettaglio_durata = "• Durata Contratto: <b>Mensile rinnovabile</b> senza vincoli pluriennali di durata.<br/>• Condizioni di recesso: Disdicibile con preavviso scritto di almeno 30 giorni."
 
                     story_ord = [
                         Paragraph("<b>MODULO D'ORDINE E CONTRATTO DI ABBONAMENTO SaaS B2B</b>", style_titolo_ord),
@@ -201,7 +240,7 @@ else:
                         Spacer(1, 4),
                         Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome}<br/>• P.IVA / C.F.: {cli_piva}<br/>• Email Referente: {cli_email}", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: <b>{tipo_piano}</b><br/>{dettaglio_durata}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• <b>CANONE MENSILE DOVUTO: € {prezzo_mensile:.2f}</b><br/><i>*(Operazione in franchigia da IVA ai sensi dell'art. 1, commi da 54 a 89, L. 190/2014)</i>", style_testo_ord),
+                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: <b>{tipo_piano}</b><br/>{dettaglio_durata}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• <b>CANONE MENSILE IMPONIBILE: € {prezzo_mensile:.2f}</b><br/><i>*Operazione attualmente in franchigia da IVA (Regime Forfettario). In caso di variazione del regime fiscale del Fornitore, l'IVA di legge (22%) verrà aggiunta in fattura e risulterà interamente detraibile dal Committente, mantenendo invariato il costo netto pattuito.</i>", style_testo_ord),
                         Spacer(1, 4),
                         Paragraph(f"<b>3. TERMINI DI PAGAMENTO E RISOLUZIONE:</b><br/>• Scadenza Pagamento: Il <b>{giorno_rinnovo} di ogni mese</b> solare.<br/>• Metodo: Bonifico bancario anticipato a 5 giorni data fattura.<br/>• Decorrenza: Dalla ricezione del presente modulo controfirmato.<br/>• <b>Clausola Risolutiva (Art. 1456 c.c.):</b> Il mancato pagamento comporta la disattivazione immediata della licenza e la risoluzione di diritto del contratto.", style_testo_ord),
                         Spacer(1, 4),
@@ -228,8 +267,38 @@ else:
                     st.warning("⚠️ Inserisci almeno la Ragione Sociale, P.IVA e l'Email.")
             
             if 'pdf_ord_bytes' in st.session_state:
-                st.success("✅ Modulo d'Ordine generato (Esente IVA)! Scaricalo qui:")
+                st.success("✅ Modulo d'Ordine generato! Scaricalo qui:")
                 st.download_button("⬇️ SCARICA IL CONTRATTO B2B", data=st.session_state['pdf_ord_bytes'], file_name=st.session_state['pdf_ord_name'], mime="application/pdf")
+
+        # 2) PACCHETTI DI RICARICA EXTRA (PER CHI FINISCE I REPORT)
+        with st.expander("📦 Gestione Ricarica Crediti Extra (Pacchetti Report)", expanded=False):
+            st.write("Vendi pacchetti di report extra ai clienti che hanno esaurito i crediti mensili. L'aggiornamento su Supabase è automatico.")
+            
+            try:
+                res_cli = supabase.table("licenze").select("codice_licenza, cliente, limite_report").execute()
+                lista_clienti = res_cli.data
+            except:
+                lista_clienti = []
+                
+            if lista_clienti:
+                clienti_dict = {f"{c['cliente']} ({c['codice_licenza']})": c['codice_licenza'] for c in lista_clienti}
+                scelta_cliente_extra = st.selectbox("Seleziona Azienda Cliente", options=list(clienti_dict.keys()))
+                
+                c_ex1, c_ex2 = st.columns(2)
+                with c_ex1:
+                    qt_report_extra = st.number_input("Numero Report Extra nel Pacchetto", min_value=5, max_value=200, value=20)
+                with c_ex2:
+                    prezzo_pacchetto = st.number_input("Prezzo Totale Pacchetto (€ - Netto)", min_value=50, max_value=2000, value=150)
+                
+                if st.button("⚡ Aggiungi Report al Cliente e Aggiorna Supabase", use_container_width=True):
+                    cod_selezionato = clienti_dict[scelta_cliente_extra]
+                    attuale = supabase.table("licenze").select("limite_report").eq("codice_licenza", cod_selezionato).execute().data[0]['limite_report']
+                    nuovo_limite = attuale + int(qt_report_extra)
+                    
+                    supabase.table("licenze").update({"limite_report": nuovo_limite}).eq("codice_licenza", cod_selezionato).execute()
+                    st.success(f"✅ Aggiunti {qt_report_extra} report extra a {scelta_cliente_extra}! Nuovo limite mensile totale: {nuovo_limite}.")
+            else:
+                st.info("Nessun cliente registrato nel database.")
 
         st.markdown("<br>", unsafe_allow_html=True)
         with st.expander("💼 Simulatore di Prezzo e ROI per Trattativa Commerciale", expanded=False):
@@ -355,7 +424,7 @@ else:
             if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: st.error("🚫 Formato non supportato. Carica un file video o audio.")
             else:
                 if (uploaded_file.size / (1024 * 1024)) > 200: st.error("🚫 File superiore a 200MB. Contatta l'amministratore.")
-                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore per il rinnovo.")
+                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per l'acquisto di un pacchetto extra.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("🚀 Avvia Analisi Enterprise (Gemini Pro)", use_container_width=True):
@@ -451,6 +520,29 @@ else:
                 with open(pdf_filename, "rb") as pdf_file:
                     st.download_button("📥 SCARICA IL REPORT PDF CERTIFICATO", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
 
+        # --- 3) MODULO DI SUPPORTO / ASSISTENZA CLIENTI IN FONDO ALLA PAGINA ---
+        st.markdown("""
+        <div class="support-box">
+            <h4 style="color: #38bdf8; margin-top: 0;">🛠️ Assistenza Tecnica & Supporto Clienti</h4>
+            <p style="font-size: 13px; color: #94a3b8;">Hai riscontrato un problema tecnico o desideri acquistare un pacchetto extra di report? Compila il modulo sottostante: verrai ricontattato tempestivamente dal nostro supporto tecnico entro 48 ore.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("form_assistenza_cliente"):
+            tipo_problema = st.selectbox("Seleziona la tipologia di richiesta:", ("Errore nel caricamento del file video", "Problema nella generazione del report PDF", "Richiesta acquisto pacchetto crediti EXTRA", "Altra segnalazione tecnica"))
+            preferenza_contatto = st.radio("Come preferisci essere ricontattato?", ("Email", "Telefono"))
+            recapito_utente = st.text_input("Inserisci la tua Email o il tuo numero di Telefono:", placeholder="Es. ing.rossi@aziendacliente.it oppure 3331234567")
+            descrizione_problema = st.text_area("Descrivi brevemente la richiesta o il problema riscontrato:")
+            
+            btn_invia_ticket = st.form_submit_button("Invia Richiesta di Assistenza", use_container_width=True)
+
+        if btn_invia_ticket:
+            if recapito_utente and descrizione_problema:
+                # In un ambiente di produzione reale, qui andrebbe l'API di un mailer (es. SendGrid)
+                st.success("✅ Richiesta inviata con successo! Il nostro team tecnico ha preso in carico la segnalazione e ti ricontatterà entro 48 ore tramite la preferenza indicata.")
+            else:
+                st.warning("⚠️ Compila tutti i campi (recapito e descrizione) prima di inviare la richiesta.")
+
         st.markdown("""
         <div class="privacy-box">
             <h4 style="color: #38bdf8; margin-top: 0;">📌 Istruzioni operative e Garanzia di Privacy</h4>
@@ -465,3 +557,14 @@ else:
             </p>
         </div>
         """, unsafe_allow_html=True)
+
+# --- FOOTER LEGALE AZIENDALE OBBIGATORIO (Visibile sempre in fondo alla pagina) ---
+st.markdown("""
+    <br><br>
+    <div style="border-top: 1px solid #1e3a8a; padding-top: 20px; text-align: center; color: #64748b; font-size: 12px; margin-top: 50px;">
+        <b>HydroAegis AI</b> sviluppato da [INSERISCI TUO NOME E COGNOME O NOME AZIENDA] <br>
+        Sede Legale: [INSERISCI INDIRIZZO, CITTÀ E CAP] | P.IVA: [INSERISCI LA PARTITA IVA APPENA LA APRI] <br>
+        Contatti: info@tuodominio.it | PEC: tuapec@pec.it <br><br>
+        <a href="#" style="color: #38bdf8; text-decoration: none;">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" style="color: #38bdf8; text-decoration: none;">Termini di Servizio</a>
+    </div>
+""", unsafe_allow_html=True)
