@@ -8,6 +8,7 @@ import string
 import hashlib
 import re
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -29,6 +30,8 @@ st.markdown("""
     .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; margin-bottom: 20px; font-size: 14px; color: #cbd5e1; }
     .support-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #38bdf8; padding: 20px; border-radius: 12px; margin-top: 30px; margin-bottom: 20px; }
     .roi-box { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; margin-top: 15px; }
+    .client-row { background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; margin-bottom: 10px; }
+    .client-suspended { border-left: 4px solid #ef4444; opacity: 0.8; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -78,29 +81,6 @@ if not st.session_state['logged_in']:
         username = st.text_input("Nome Utente")
         password = st.text_input("Password", type="password", on_change=trigger_login)
         
-        has_upper = any(c.isupper() for c in password) if password else False
-        has_num = any(c.isdigit() for c in password) if password else False
-        has_spec = any(not c.isalnum() for c in password) if password else False
-        
-        if not password:
-            i_up = i_num = i_spec = "-"
-            c_up = c_num = c_spec = "#94a3b8"
-        else:
-            i_up, c_up = ("✅", "#10b981") if has_upper else ("❌", "#ef4444")
-            i_num, c_num = ("✅", "#10b981") if has_num else ("❌", "#ef4444")
-            i_spec, c_spec = ("✅", "#10b981") if has_spec else ("❌", "#ef4444")
-
-        st.markdown(f"""
-        <details>
-            <summary>ℹ️ Clicca qui per le Regole Password</summary>
-            <div class="req-box">
-                <div style="color: {c_up};">{i_up} Almeno una lettera maiuscola</div>
-                <div style="color: {c_num};">{i_num} Almeno un numero</div>
-                <div style="color: {c_spec};">{i_spec} Almeno un carattere speciale (!, ?, @, ecc.)</div>
-            </div>
-        </details>
-        """, unsafe_allow_html=True)
-        
         btn_accedi = st.button("Accedi", use_container_width=True)
         
         if btn_accedi or st.session_state['do_login']:
@@ -110,38 +90,32 @@ if not st.session_state['logged_in']:
                 st.session_state['is_admin'] = True
                 st.rerun()
             elif username == "cliente1" and password == "Mare2026!":
-                if has_upper and has_num and has_spec:
-                    try:
-                        response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
-                        dati = response.data
-                        if len(dati) > 0:
-                            licenza_valida = dati[0].get("attiva", False)
-                            nome_cliente = dati[0].get("cliente", "Sconosciuto")
-                            if licenza_valida:
-                                st.session_state['logged_in'] = True
-                                st.session_state['is_admin'] = False
-                                st.session_state['nome_cliente'] = nome_cliente
-                                st.session_state['codice_licenza'] = licenza 
-                                st.rerun()
-                            else:
-                                st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
+                try:
+                    response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
+                    dati = response.data
+                    if len(dati) > 0:
+                        licenza_valida = dati[0].get("attiva", False)
+                        nome_cliente = dati[0].get("cliente", "Sconosciuto")
+                        if licenza_valida:
+                            st.session_state['logged_in'] = True
+                            st.session_state['is_admin'] = False
+                            st.session_state['nome_cliente'] = nome_cliente
+                            st.session_state['codice_licenza'] = licenza 
+                            st.rerun()
                         else:
-                            st.error("🚫 Codice Licenza inesistente.")
-                    except:
-                        st.error("Errore di connessione al database di sicurezza.")
-                else:
-                    st.error("⚠️ La password non rispetta i requisiti minimi.")
+                            st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
+                    else:
+                        st.error("🚫 Codice Licenza inesistente.")
+                except:
+                    st.error("Errore di connessione al database di sicurezza.")
             else:
                 st.error("❌ Credenziali errate.")
     
     st.markdown("<br><hr style='border-color: #1e3a8a;'><br>", unsafe_allow_html=True)
     col_v1, col_v2, col_v3 = st.columns(3)
-    with col_v1:
-        st.markdown("<div class='info-card'><h4>⚡ Motore Enterprise 'Pro'</h4><p style='color: #94a3b8; font-size: 14px;'>Il nuovo core IA di classe Pro elabora logiche complesse, classificazione normativa e grammatica peritale in un unico flusso ad altissima precisione.</p></div>", unsafe_allow_html=True)
-    with col_v2:
-        st.markdown("<div class='info-card'><h4>🔐 Impronta Crittografica SHA-256</h4><p style='color: #94a3b8; font-size: 14px;'>Ogni report genera un hash forense univoco che lega indissolubilmente il PDF al filmato originale a prova di contestazione legale.</p></div>", unsafe_allow_html=True)
-    with col_v3:
-        st.markdown("<div class='info-card'><h4>📊 Classificazione IQI Automatica</h4><p style='color: #94a3b8; font-size: 14px;'>Algoritmo integrato per il calcolo immediato dell'Indice di Priorità d'Intervento strutturale secondo standard normativi.</p></div>", unsafe_allow_html=True)
+    with col_v1: st.markdown("<div class='info-card'><h4>⚡ Motore Enterprise 'Pro'</h4><p style='color: #94a3b8; font-size: 14px;'>Core IA di classe Pro per logiche complesse, classificazione normativa e grammatica peritale.</p></div>", unsafe_allow_html=True)
+    with col_v2: st.markdown("<div class='info-card'><h4>🔐 Impronta Crittografica</h4><p style='color: #94a3b8; font-size: 14px;'>Ogni report genera un hash forense univoco a prova di contestazione legale.</p></div>", unsafe_allow_html=True)
+    with col_v3: st.markdown("<div class='info-card'><h4>📊 Classificazione IQI</h4><p style='color: #94a3b8; font-size: 14px;'>Calcolo immediato dell'Indice di Priorità d'Intervento strutturale.</p></div>", unsafe_allow_html=True)
 
 else:
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -152,7 +126,7 @@ else:
         col1, col2 = st.columns([5, 1])
         with col1:
             st.title("Pannello di Controllo Direzionale & Vendite")
-            st.write("Gestisci le licenze, calcola il ROI, genera contratti e pacchetti di ricarica extra.")
+            st.write("Gestisci le licenze, i pagamenti ricorrenti, e genera contratti.")
         with col2:
             if st.button("Esci (Logout)"):
                 st.session_state['logged_in'] = False
@@ -161,65 +135,51 @@ else:
                 st.rerun()
         st.markdown("---")
 
-        # --- CRUSCOTTO FINANZIARIO (MRR & ARR) ---
         with st.expander("💶 Cruscotto Finanziario (MRR & ARR)", expanded=False):
-            st.write("Monitora in tempo reale le metriche chiave del tuo business SaaS.")
-            
             try:
                 res_fin = supabase.table("licenze").select("*").execute()
                 tutti_clienti = res_fin.data
                 clienti_attivi = sum(1 for c in tutti_clienti if c.get('attiva', False))
-                clienti_totali = len(tutti_clienti)
+                mrr_reale = sum(c.get('prezzo', 0) for c in tutti_clienti if c.get('attiva', False) and c.get('frequenza') == 'Mensile')
+                mrr_annuali = sum(c.get('prezzo', 0)/12 for c in tutti_clienti if c.get('attiva', False) and c.get('frequenza') == 'Annuale')
+                mrr_totale = mrr_reale + mrr_annuali
+                arr_totale = mrr_totale * 12
             except:
-                clienti_attivi = 0
-                clienti_totali = 0
-
-            c_fin1, c_fin2 = st.columns(2)
-            with c_fin1:
-                canone_medio = st.number_input("Canone medio mensile per cliente attivo (€)", min_value=0, max_value=5000, value=390)
-            
-            mrr = clienti_attivi * canone_medio
-            arr = mrr * 12
+                clienti_attivi, mrr_totale, arr_totale = 0, 0, 0
 
             st.markdown(f"""
-            <div style="display: flex; gap: 20px; margin-top: 15px;">
+            <div style="display: flex; gap: 20px; margin-top: 5px;">
                 <div style="flex: 1; background: rgba(14, 165, 233, 0.1); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; text-align: center;">
                     <h5 style="color: #cbd5e1; margin: 0; font-size: 14px;">MRR (Incasso Mensile)</h5>
-                    <h2 style="color: #38bdf8; margin: 5px 0 0 0; font-size: 32px;">€ {mrr:,.0f}</h2>
-                    <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Fatturato ricorrente ogni mese</p>
+                    <h2 style="color: #38bdf8; margin: 5px 0 0 0; font-size: 32px;">€ {mrr_totale:,.2f}</h2>
+                    <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Fatturato ricorrente calcolato dal DB</p>
                 </div>
                 <div style="flex: 1; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; text-align: center;">
                     <h5 style="color: #cbd5e1; margin: 0; font-size: 14px;">ARR (Incasso Annuale)</h5>
-                    <h2 style="color: #10b981; margin: 5px 0 0 0; font-size: 32px;">€ {arr:,.0f}</h2>
+                    <h2 style="color: #10b981; margin: 5px 0 0 0; font-size: 32px;">€ {arr_totale:,.2f}</h2>
                     <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Proiezione su 12 mesi</p>
                 </div>
-            </div>
-            <div style="text-align: center; margin-top: 15px; color: #94a3b8; font-size: 14px;">
-                <b>Clienti Attivi Paganti:</b> {clienti_attivi} su {clienti_totali} totali nel database
             </div>
             """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 1) GENERATORE CONTRATTO (ANNUALE / MENSILE) CON CLAUSOLA DI SALVAGUARDIA
         with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B", expanded=False):
-            st.write("Scegli tra abbonamento annuale agevolato o mensile flessibile.")
             with st.form("form_contratto_b2b"):
                 c_ord1, c_ord2 = st.columns(2)
                 with c_ord1:
                     cli_nome = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl")
                     cli_piva = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890")
                     cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
-                    giorno_rinnovo = st.number_input("Giorno del mese per scadenza/rinnovo", min_value=1, max_value=31, value=1)
                 with c_ord2:
-                    tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone agevolato con impegno 12 mesi)", "Abbonamento Mensile Flessibile (Senza vincoli, disdetta 30 giorni)"))
-                    prezzo_mensile = st.number_input("Canone Mensile Netto (€)", min_value=100, max_value=5000, value=390 if "Annuale" in tipo_piano else 490)
+                    tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone agevolato, impegno 12 mesi)", "Abbonamento Mensile Flessibile (Rinnovo automatico)"))
+                    prezzo_mensile = st.number_input("Canone Netto (€)", min_value=100, max_value=5000, value=390 if "Annuale" in tipo_piano else 490)
                     report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
                 
                 btn_genera_pdf = st.form_submit_button("⚙️ Prepara Contratto in PDF", use_container_width=True)
 
             if btn_genera_pdf:
-                if cli_nome and cli_piva and cli_email:
+                if cli_nome and cli_piva:
                     ordine_filename = f"Modulo_Ordine_HydroAegis_{cli_nome.replace(' ', '_')}.pdf"
                     doc_ord = SimpleDocTemplate(ordine_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=30, bottomMargin=30)
                     styles_ord = getSampleStyleSheet()
@@ -230,9 +190,9 @@ else:
                     style_doppia_firma = ParagraphStyle('DoppiaFirma', parent=styles_ord['Normal'], fontSize=7.5, leading=9.5, spaceAfter=8, textColor=colors.HexColor("#334155"), fontName="Helvetica-Oblique")
                     
                     if "Annuale" in tipo_piano:
-                        dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura ed esclusiva tariffa agevolata.<br/>• Condizioni di recesso: Impegno annuale con fatturazione mensile ricorrente."
+                        dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura ed esclusiva tariffa agevolata.<br/>• Condizioni di recesso: Impegno annuale, rinnovo automatico salvo disdetta 7 gg prima della scadenza."
                     else:
-                        dettaglio_durata = "• Durata Contratto: <b>Mensile rinnovabile</b> senza vincoli pluriennali di durata.<br/>• Condizioni di recesso: Disdicibile con preavviso scritto di almeno 30 giorni."
+                        dettaglio_durata = "• Durata Contratto: <b>Mensile rinnovabile automaticamente</b>.<br/>• Condizioni di recesso: Disdicibile liberamente con preavviso scritto di almeno <b>7 (sette) giorni</b> prima del successivo rinnovo."
 
                     story_ord = [
                         Paragraph("<b>MODULO D'ORDINE E CONTRATTO DI ABBONAMENTO SaaS B2B</b>", style_titolo_ord),
@@ -240,9 +200,9 @@ else:
                         Spacer(1, 4),
                         Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome}<br/>• P.IVA / C.F.: {cli_piva}<br/>• Email Referente: {cli_email}", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: <b>{tipo_piano}</b><br/>{dettaglio_durata}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• <b>CANONE MENSILE IMPONIBILE: € {prezzo_mensile:.2f}</b><br/><i>*Operazione attualmente in franchigia da IVA (Regime Forfettario). In caso di variazione del regime fiscale del Fornitore, l'IVA di legge (22%) verrà aggiunta in fattura e risulterà interamente detraibile dal Committente, mantenendo invariato il costo netto pattuito.</i>", style_testo_ord),
+                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: <b>{tipo_piano}</b><br/>{dettaglio_durata}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• <b>CANONE IMPONIBILE: € {prezzo_mensile:.2f}</b><br/><i>*Operazione attualmente in franchigia da IVA (Regime Forfettario). In caso di variazione del regime fiscale del Fornitore, l'IVA di legge (22%) verrà aggiunta in fattura e risulterà interamente detraibile dal Committente, mantenendo invariato il costo netto pattuito.</i>", style_testo_ord),
                         Spacer(1, 4),
-                        Paragraph(f"<b>3. TERMINI DI PAGAMENTO E RISOLUZIONE:</b><br/>• Scadenza Pagamento: Il <b>{giorno_rinnovo} di ogni mese</b> solare.<br/>• Metodo: Bonifico bancario anticipato a 5 giorni data fattura.<br/>• Decorrenza: Dalla ricezione del presente modulo controfirmato.<br/>• <b>Clausola Risolutiva (Art. 1456 c.c.):</b> Il mancato pagamento comporta la disattivazione immediata della licenza e la risoluzione di diritto del contratto.", style_testo_ord),
+                        Paragraph(f"<b>3. TERMINI DI PAGAMENTO E RISOLUZIONE:</b><br/>• Metodo di Pagamento: Addebito automatico su metodo di pagamento registrato (Carta/SEPA) o Bonifico Bancario anticipato.<br/>• Decorrenza: Dalla ricezione del presente modulo controfirmato.<br/>• Rinnovo: <b>Automatico</b> alla scadenza del periodo, salvo disdetta formale inviata almeno 7 giorni prima.<br/>• <b>Clausola Risolutiva (Art. 1456 c.c.):</b> Il mancato pagamento comporta la disattivazione immediata della licenza.", style_testo_ord),
                         Spacer(1, 4),
                         Paragraph("<b>4. LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce uno strumento di supporto decisionale. La validazione tecnica dei dati e la classificazione alla norma EN 13508-2 restano ad esclusivo carico del tecnico abilitato del Committente. Il Fornitore è manlevato da responsabilità inerenti le decisioni di cantiere.", style_testo_ord),
                         Spacer(1, 4),
@@ -252,7 +212,7 @@ else:
                         Spacer(1, 10),
                         Paragraph("<b>Luogo e Data:</b> _________________________ &nbsp;&nbsp;&nbsp;&nbsp; <b>Il Committente (Firma):</b> _________________________", style_testo_ord),
                         Spacer(1, 14),
-                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 C.C., il Committente dichiara di approvare specificamente le clausole: <b>3</b> (Risoluzione Espressa), <b>4</b> (Limitazione Responsabilità), <b>5</b> (Forza Maggiore) e <b>6</b> (Foro Competente).", style_doppia_firma),
+                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 C.C., il Committente dichiara di approvare specificamente le clausole: <b>3</b> (Pagamento e Rinnovo Automatico), <b>4</b> (Limitazione Responsabilità), <b>5</b> (Forza Maggiore) e <b>6</b> (Foro Competente).", style_doppia_firma),
                         Spacer(1, 8),
                         Paragraph("<b>Il Committente (Seconda Firma Obbligatoria):</b> _________________________", style_testo_ord),
                         Spacer(1, 20),
@@ -263,90 +223,49 @@ else:
                     with open(ordine_filename, "rb") as f_ord:
                         st.session_state['pdf_ord_bytes'] = f_ord.read()
                         st.session_state['pdf_ord_name'] = ordine_filename
-                else:
-                    st.warning("⚠️ Inserisci almeno la Ragione Sociale, P.IVA e l'Email.")
             
             if 'pdf_ord_bytes' in st.session_state:
-                st.success("✅ Modulo d'Ordine generato! Scaricalo qui:")
+                st.success("✅ Modulo d'Ordine generato con regole di Rinnovo Automatico e Disdetta a 7 giorni!")
                 st.download_button("⬇️ SCARICA IL CONTRATTO B2B", data=st.session_state['pdf_ord_bytes'], file_name=st.session_state['pdf_ord_name'], mime="application/pdf")
 
-        # 2) PACCHETTI DI RICARICA EXTRA (PER CHI FINISCE I REPORT)
-        with st.expander("📦 Gestione Ricarica Crediti Extra (Pacchetti Report)", expanded=False):
-            st.write("Vendi pacchetti di report extra ai clienti che hanno esaurito i crediti mensili. L'aggiornamento su Supabase è automatico.")
-            
-            try:
-                res_cli = supabase.table("licenze").select("codice_licenza, cliente, limite_report").execute()
-                lista_clienti = res_cli.data
-            except:
-                lista_clienti = []
-                
-            if lista_clienti:
-                clienti_dict = {f"{c['cliente']} ({c['codice_licenza']})": c['codice_licenza'] for c in lista_clienti}
-                scelta_cliente_extra = st.selectbox("Seleziona Azienda Cliente", options=list(clienti_dict.keys()))
-                
-                c_ex1, c_ex2 = st.columns(2)
-                with c_ex1:
-                    qt_report_extra = st.number_input("Numero Report Extra nel Pacchetto", min_value=5, max_value=200, value=20)
-                with c_ex2:
-                    prezzo_pacchetto = st.number_input("Prezzo Totale Pacchetto (€ - Netto)", min_value=50, max_value=2000, value=150)
-                
-                if st.button("⚡ Aggiungi Report al Cliente e Aggiorna Supabase", use_container_width=True):
-                    cod_selezionato = clienti_dict[scelta_cliente_extra]
-                    attuale = supabase.table("licenze").select("limite_report").eq("codice_licenza", cod_selezionato).execute().data[0]['limite_report']
-                    nuovo_limite = attuale + int(qt_report_extra)
-                    
-                    supabase.table("licenze").update({"limite_report": nuovo_limite}).eq("codice_licenza", cod_selezionato).execute()
-                    st.success(f"✅ Aggiunti {qt_report_extra} report extra a {scelta_cliente_extra}! Nuovo limite mensile totale: {nuovo_limite}.")
-            else:
-                st.info("Nessun cliente registrato nel database.")
-
         st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("💼 Simulatore di Prezzo e ROI per Trattativa Commerciale", expanded=False):
-            c_r1, c_r2 = st.columns(2)
-            with c_r1:
-                ore_video_mese = st.number_input("Ore di video analizzate al mese:", min_value=1, max_value=500, value=20)
-            with c_r2:
-                costo_orario_tecnico = st.number_input("Costo orario tecnico (stipendio + oneri):", min_value=15, max_value=100, value=35)
-            
-            ore_risparmiate = ore_video_mese * 2.5
-            risparmio = ore_risparmiate * costo_orario_tecnico
-            prezzo_consigliato = max(290, round(risparmio * 0.3, -1))
-            
-            st.markdown(f"""
-            <div class="roi-box">
-                <p>🕒 Ore umane risparmiate: <b>{ore_risparmiate:.1f} ore/mese</b></p>
-                <p>💸 Costo manuale sprecato: <b>{risparmio:,.2f} € / mese</b></p>
-                <p style="color: #38bdf8; font-size: 18px;">💡 <b>Prezzo Vendita Suggerito: {prezzo_consigliato:,.0f} € / mese</b></p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("➕ Aggiungi Nuovo Cliente e Licenza", expanded=False):
+        with st.expander("➕ Aggiungi Nuovo Cliente (Attivazione Licenza)", expanded=False):
             st.session_state['input_cliente'] = st.text_input("Nome Cliente / Azienda", value=st.session_state['input_cliente'])
             col_l1, col_l2 = st.columns([3, 1])
             with col_l1:
                 st.session_state['input_licenza'] = st.text_input("Codice Licenza", value=st.session_state['input_licenza'])
             with col_l2:
                 st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                if st.button("Genera", use_container_width=True):
+                if st.button("Genera Codice", use_container_width=True):
                     genera_codice()
                     st.rerun()
-            limite_impostato = st.number_input("Report mensili inclusi:", min_value=5, max_value=1000, value=50)
+            col_d1, col_d2, col_d3 = st.columns(3)
+            with col_d1:
+                limite_impostato = st.number_input("Report mensili inclusi:", min_value=5, max_value=1000, value=50)
+            with col_d2:
+                frequenza_scelta = st.selectbox("Frequenza Pagamento", ["Mensile", "Annuale"])
+            with col_d3:
+                prezzo_inserito = st.number_input("Prezzo Concordato (€)", min_value=0, max_value=10000, value=390)
 
-            if st.button("✅ Salva Nuova Licenza", use_container_width=True):
+            if st.button("✅ Salva Nuova Licenza e Avvia Ciclo Pagamenti", use_container_width=True):
                 if st.session_state['input_cliente'] and st.session_state['input_licenza']:
+                    oggi = datetime.now()
+                    str_oggi = oggi.strftime("%d/%m/%Y")
+                    if frequenza_scelta == "Mensile": prossimo = (oggi + relativedelta(months=1)).strftime("%d/%m/%Y")
+                    else: prossimo = (oggi + relativedelta(years=1)).strftime("%d/%m/%Y")
+
                     try:
-                        supabase.table("licenze").insert({"cliente": st.session_state['input_cliente'], "codice_licenza": st.session_state['input_licenza'], "attiva": True, "limite_report": limite_impostato, "report_consumati": 0}).execute()
-                        st.success("✅ Licenza creata con successo!")
+                        supabase.table("licenze").insert({"cliente": st.session_state['input_cliente'], "codice_licenza": st.session_state['input_licenza'], "attiva": True, "limite_report": limite_impostato, "report_consumati": 0, "prezzo": prezzo_inserito, "frequenza": frequenza_scelta, "ultimo_pagamento": str_oggi, "prossimo_rinnovo": prossimo}).execute()
+                        st.success("✅ Licenza creata! Ciclo di fatturazione avviato.")
                         st.session_state['input_cliente'] = ""
                         st.session_state['input_licenza'] = ""
-                        time.sleep(1)
+                        time.sleep(1.5)
                         st.rerun()
-                    except: st.error("Errore: Impossibile creare la licenza.")
-                else: st.warning("⚠️ Compila entrambi i campi.")
+                    except Exception as e: st.error(f"Errore: {e}")
+                else: st.warning("⚠️ Compila nome e codice licenza.")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("👥 Database Clienti (Riservato)", expanded=False):
+        with st.expander("👥 Database Clienti e Pagamenti (Riservato)", expanded=False):
             ricerca = st.text_input("🔍 Cerca per nome o codice...", placeholder="Digita qui...")
             try:
                 risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
@@ -367,25 +286,43 @@ else:
                                     st.session_state['delete_target'] = None
                                     st.rerun()
                         else:
-                            bg_color = "rgba(30, 41, 59, 0.6)" if i % 2 == 0 else "rgba(15, 23, 42, 0.4)"
+                            bg_class = "client-row" if riga['attiva'] else "client-row client-suspended"
                             limite = riga.get('limite_report', 50)
                             consumati = riga.get('report_consumati', 0)
+                            prezzo = riga.get('prezzo', 'N/D')
+                            freq = riga.get('frequenza', 'N/D')
+                            ultimo = riga.get('ultimo_pagamento', 'N/D')
+                            prossimo = riga.get('prossimo_rinnovo', 'N/D')
+                            stato = "🟢 Attivo" if riga['attiva'] else "🔴 Sospeso"
+                            
                             c_del, c_info, c_act = st.columns([0.4, 4.5, 1])
                             with c_del:
-                                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
                                 if st.button("❌", key=f"del_{riga['codice_licenza']}"):
                                     st.session_state['delete_target'] = riga['codice_licenza']
                                     st.rerun()
                             with c_info:
-                                stato = "🟢 Attivo" if riga['attiva'] else "🔴 Sospeso"
-                                st.markdown(f"<div style='background-color: {bg_color}; padding: 14px; border-radius: 8px; border-left: 4px solid {'#10b981' if riga['attiva'] else '#ef4444'}; display: flex; justify-content: space-between;'><span style='font-weight: bold; width: 35%;'>{riga['cliente']}</span><span style='font-family: monospace; color: #38bdf8; width: 35%;'>{riga['codice_licenza']}</span><span style='width: 30%; font-size: 13px; color: #94a3b8;'>{stato} | {consumati}/{limite} rep.</span></div>", unsafe_allow_html=True)
+                                st.markdown(f"""
+                                <div class="{bg_class}">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                        <span style="font-weight: bold; font-size: 16px;">{riga['cliente']}</span>
+                                        <span style="font-size: 14px; color: #38bdf8;">€ {prezzo} ({freq})</span>
+                                        <span style="font-family: monospace; color: #94a3b8;">{riga['codice_licenza']}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1;">
+                                        <span><b>Report:</b> {consumati}/{limite}</span>
+                                        <span><b>Ultimo Pag:</b> {ultimo}</span>
+                                        <span style="color: {'#10b981' if riga['attiva'] else '#ef4444'};"><b>Prox Rinnovo:</b> {prossimo}</span>
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
                             with c_act:
-                                st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+                                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
                                 lbl = "Sospendi" if riga['attiva'] else "Riattiva"
                                 if st.button(lbl, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
                                     supabase.table("licenze").update({"attiva": not riga['attiva']}).eq("codice_licenza", riga['codice_licenza']).execute()
                                     st.rerun()
-            except: st.error("Errore di connessione a Supabase.")
+            except Exception as e: st.error(f"Errore DB: {e}")
                 
     # --- VISUALE CLIENTE ---
     else:
@@ -405,7 +342,12 @@ else:
             cliente = st.session_state.get('nome_cliente', 'Cliente')
             limite_totale = dati_cliente.get('limite_report', 50) if dati_cliente else 50
             report_fatti = dati_cliente.get('report_consumati', 0) if dati_cliente else 0
-            st.markdown(f"Benvenuto, **{cliente}** &nbsp;|&nbsp; <span style='font-size: 13px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);'>📊 Utilizzo Crediti: {report_fatti} / {limite_totale} Report</span>", unsafe_allow_html=True)
+            prox_rinnovo = dati_cliente.get('prossimo_rinnovo', 'N/D') if dati_cliente else 'N/D'
+            
+            st.markdown(f"""Benvenuto, **{cliente}** &nbsp;|&nbsp; 
+                        <span style='font-size: 13px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);'>📊 Crediti: {report_fatti} / {limite_totale} Report</span>
+                        &nbsp;|&nbsp; <span style='font-size: 12px; color: #94a3b8;'>Rinnovo Licenza: {prox_rinnovo}</span>
+                        """, unsafe_allow_html=True)
         with col2:
             st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
             if st.button("Esci (Logout)", use_container_width=True):
@@ -423,10 +365,12 @@ else:
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
             if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: st.error("🚫 Formato non supportato. Carica un file video o audio.")
             else:
-                if (uploaded_file.size / (1024 * 1024)) > 200: st.error("🚫 File superiore a 200MB. Contatta l'amministratore.")
-                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per l'acquisto di un pacchetto extra.")
+                if (uploaded_file.size / (1024 * 1024)) > 2000: st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
+                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
+                    
+                    # TASTO AVVIA ANALISI: QUI ORA VIENE SCALATO IL CREDITO
                     if st.button("🚀 Avvia Analisi Enterprise (Gemini Pro)", use_container_width=True):
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
@@ -455,21 +399,25 @@ else:
                             2. Assegna a ogni difetto il codice normativo EN 13508-2 pertinente.
                             3. Calcola l'Indice di Priorità d'Intervento (IQI: Classe 1 - Emergenza, Classe 2 - Programmata, Classe 3 - Monitoraggio).
                             4. Struttura chiaramente in 3 sezioni: RILEVAZIONE ANOMALIE, CLASSIFICAZIONE IQI, VALUTAZIONE STRUTTURALE.
-                            5. CORREZIONE ORTOGRAFICA OBBLIGATORIA: Il testo deve essere grammaticalmente perfetto, sintatticamente formale, con accordi di genere/numero ineccepibili. Usa terminologia accademica/ingegneristica.
-                            6. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, CANCELLETTI O MARKDOWN. Scrivi puro testo professionale formattato in paragrafi e punti elenco nativi.
+                            5. CORREZIONE ORTOGRAFICA OBBLIGATORIA: Il testo deve essere grammaticalmente perfetto.
+                            6. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, CANCELLETTI O MARKDOWN. Scrivi puro testo professionale formattato in paragrafi.
                             """
                             testo_generato = model.generate_content([media_file, prompt_2]).text
                             st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
                             os.remove(tmp_file_path)
+                            
+                            # ---> IL CREDITO VIENE SCALATO QUI (SUBITO DOPO L'ANALISI DELL'IA) <---
+                            try:
+                                supabase.table("licenze").update({"report_consumati": report_fatti + 1}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
+                            except:
+                                pass
 
         if 'report_text' in st.session_state:
-            st.success("✅ Analisi Pro e correzione ortografica completate con successo!")
+            st.success("✅ Analisi completata! (Un credito è stato regolarmente scalato dal tuo abbonamento).")
             testo_revisionato = st.text_area("Bozza Certificata (Modificabile)", value=st.session_state['report_text'], height=400)
             
+            # IL TASTO GENERA PDF ORA È GRATUITO E NON SCALA CREDITI
             if st.button("Genera PDF Definitivo con Impronta Forense"):
-                try: supabase.table("licenze").update({"report_consumati": report_fatti + 1}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
-                except: pass
-
                 pdf_filename = "Report_Ispezione_Certificato.pdf"
                 doc = SimpleDocTemplate(pdf_filename, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
                 styles = getSampleStyleSheet()
@@ -484,7 +432,6 @@ else:
                 style_legal = ParagraphStyle('LegalNotice', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=colors.HexColor("#64748b"))
 
                 story = []
-
                 data_odierna = datetime.now().strftime("%d/%m/%Y - %H:%M")
                 table_header = Table([
                     [Paragraph("<b>HYDROAEGIS AI | RAPPORTO TECNICO CERTIFICATO</b>", style_header_title), Paragraph(f"<b>Data Emissione:</b> {data_odierna}", style_meta)],
@@ -520,7 +467,7 @@ else:
                 with open(pdf_filename, "rb") as pdf_file:
                     st.download_button("📥 SCARICA IL REPORT PDF CERTIFICATO", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
 
-        # --- 3) MODULO DI SUPPORTO / ASSISTENZA CLIENTI IN FONDO ALLA PAGINA ---
+        # --- MODULO DI SUPPORTO / ASSISTENZA CLIENTI ---
         st.markdown("""
         <div class="support-box">
             <h4 style="color: #38bdf8; margin-top: 0;">🛠️ Assistenza Tecnica & Supporto Clienti</h4>
@@ -529,7 +476,7 @@ else:
         """, unsafe_allow_html=True)
 
         with st.form("form_assistenza_cliente"):
-            tipo_problema = st.selectbox("Seleziona la tipologia di richiesta:", ("Errore nel caricamento del file video", "Problema nella generazione del report PDF", "Richiesta acquisto pacchetto crediti EXTRA", "Altra segnalazione tecnica"))
+            tipo_problema = st.selectbox("Seleziona la tipologia di richiesta:", ("Errore nel caricamento del file video", "Problema nella generazione del report PDF", "Richiesta acquisto pacchetto crediti EXTRA", "Disdetta abbonamento (Preavviso 7 giorni)", "Altra segnalazione tecnica"))
             preferenza_contatto = st.radio("Come preferisci essere ricontattato?", ("Email", "Telefono"))
             recapito_utente = st.text_input("Inserisci la tua Email o il tuo numero di Telefono:", placeholder="Es. ing.rossi@aziendacliente.it oppure 3331234567")
             descrizione_problema = st.text_area("Descrivi brevemente la richiesta o il problema riscontrato:")
@@ -538,27 +485,11 @@ else:
 
         if btn_invia_ticket:
             if recapito_utente and descrizione_problema:
-                # In un ambiente di produzione reale, qui andrebbe l'API di un mailer (es. SendGrid)
                 st.success("✅ Richiesta inviata con successo! Il nostro team tecnico ha preso in carico la segnalazione e ti ricontatterà entro 48 ore tramite la preferenza indicata.")
             else:
                 st.warning("⚠️ Compila tutti i campi (recapito e descrizione) prima di inviare la richiesta.")
 
-        st.markdown("""
-        <div class="privacy-box">
-            <h4 style="color: #38bdf8; margin-top: 0;">📌 Istruzioni operative e Garanzia di Privacy</h4>
-            <ol style="margin-bottom: 12px; padding-left: 20px;">
-                <li><b>Seleziona l'ambiente corretto</b> dal menu a tendina.</li>
-                <li><b>Carica il file multimediale</b> dell'ispezione.</li>
-                <li><b>Avvia l'analisi</b> e attendi il completamento del workflow dell'Intelligenza Artificiale Pro.</li>
-            </ol>
-            <hr style="border-color: #1e3a8a; margin: 12px 0;">
-            <p style="margin: 0; font-size: 13px; color: #94a3b8;">
-                🛡️ <b>Disclaimer sulla Privacy:</b> I file caricati vengono elaborati temporaneamente per la generazione del report e <b>non vengono conservati o usati per addestrare modelli IA.</b> La proprietà resta interamente del committente.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-# --- FOOTER LEGALE AZIENDALE OBBIGATORIO (Visibile sempre in fondo alla pagina) ---
+# --- FOOTER LEGALE AZIENDALE OBBIGATORIO ---
 st.markdown("""
     <br><br>
     <div style="border-top: 1px solid #1e3a8a; padding-top: 20px; text-align: center; color: #64748b; font-size: 12px; margin-top: 50px;">
