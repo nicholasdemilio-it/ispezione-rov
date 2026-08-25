@@ -464,24 +464,23 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        # --- SCANNER AUTOMATICO ANTI-404 ---
-                        # Chiediamo a Google quali modelli sono sbloccati per la tua API
-                        modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        # --- SCANNER AUTOMATICO ANTI-404 AGGIORNATO ---
+                        try:
+                            modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        except Exception:
+                            modelli_disponibili = []
                         
                         modello_ideale = None
-                        # Cerca il miglior modello disponibile partendo dai più potenti
-                        for nome in ["models/gemini-1.5-pro", "models/gemini-1.5-flash", "models/gemini-1.5-pro-latest", "models/gemini-pro"]:
+                        
+                        # Priorità assoluta ai modelli di ultimissima generazione consigliati da Google
+                        for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro"]:
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
                                 break
                                 
-                        # Fallback di sicurezza: se non trova i preferiti, prende il primo video-capace che Google ci offre
-                        if not modello_ideale and len(modelli_disponibili) > 0:
-                            modello_ideale = modelli_disponibili[0]
-                        
+                        # Fallback estremo se lo scanner fallisce: usiamo esattamente la stringa consigliata dall'errore
                         if not modello_ideale:
-                            st.error("⚠️ Nessun modello compatibile trovato per questa chiave API.")
-                            st.stop()
+                            modello_ideale = "models/gemini-3.6-flash"
                             
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
