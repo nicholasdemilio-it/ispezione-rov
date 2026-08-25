@@ -92,7 +92,6 @@ if not st.session_state['logged_in']:
                 st.session_state['is_admin'] = True
                 st.rerun()
             elif username == "cliente1" and password == "Mare2026!":
-                # Sistema di Auto-Riavvio silenzioso per il Cold Start del Server
                 for tentativo in range(2): 
                     try:
                         response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).execute()
@@ -110,10 +109,10 @@ if not st.session_state['logged_in']:
                                 st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA.")
                         else:
                             st.error("🚫 Codice Licenza inesistente.")
-                        break # Se ha successo, esce dal ciclo
+                        break
                     except Exception as e:
                         if tentativo == 0:
-                            time.sleep(1.5) # DB in cold start, attende e riprova
+                            time.sleep(1.5)
                         else:
                             st.error("Errore di rete: il server di sicurezza è temporaneamente irraggiungibile. Riprova tra poco.")
             else:
@@ -129,7 +128,6 @@ else:
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     
-    # --- VISUALE SUPER ADMIN ---
     if st.session_state.get('is_admin'):
         col1, col2 = st.columns([5, 1])
         with col1:
@@ -393,7 +391,8 @@ else:
                                 if st.button(lbl, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
                                     supabase.table("licenze").update({"attiva": not riga['attiva']}).eq("codice_licenza", riga['codice_licenza']).execute()
                                     st.rerun()
-            except: st.error("Errore di connessione al database clienti.")
+            except Exception as e: 
+                st.error(f"Errore di sistema nel database clienti: {e}")
                 
     # --- VISUALE CLIENTE ---
     else:
@@ -464,7 +463,6 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        # --- SCANNER AUTOMATICO ANTI-404 AGGIORNATO ---
                         try:
                             modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                         except Exception:
@@ -472,13 +470,11 @@ else:
                         
                         modello_ideale = None
                         
-                        # Priorità assoluta ai modelli di ultimissima generazione consigliati da Google
                         for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro"]:
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
                                 break
                                 
-                        # Fallback estremo se lo scanner fallisce: usiamo esattamente la stringa consigliata dall'errore
                         if not modello_ideale:
                             modello_ideale = "models/gemini-3.6-flash"
                             
@@ -486,7 +482,7 @@ else:
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
-                                time.sleep(2) # Respiro per la sincronizzazione file sui server
+                                time.sleep(2)
                                 ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
                                 bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
                             except Exception as e:
@@ -513,7 +509,6 @@ else:
                                 st.error(f"⚠️ Errore durante la fase di certificazione (Fase 2): {e}")
                                 st.stop()
                             
-                            # SCALA SUBITO IL CREDITO
                             try:
                                 supabase.table("licenze").update({"report_consumati": report_fatti + 1}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
                             except: pass
