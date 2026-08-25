@@ -687,10 +687,14 @@ else:
 # --- FOOTER LEGALE AZIENDALE OBBIGATORIO ---
 st.markdown("""
     <br><br>
-    <div style="border-top: 1px solid #1e3a8a; padding-top: 20px; text-align: center; color: #64748b; font-size: 12px; margin-top: 50px;">
+    <div style="border-top: 1px solid #1e3a8a; padding-top: 20px; text-align: center; color: #64748b; font-size: 12px; margin-top: 50px; margin-bottom: 10px;">
         <b>HydroAegis AI</b> sviluppato da HydroAegis <br>
         Sede Legale: Via Campagna 18, 21036 Gemonio (VA) | P.IVA: In fase di attivazione <br>
-        Contatti: info@hydroaegis.it | PEC: hydroaegis@pec.it <br><br>
-       <a href="privacy" target="_blank" style="color: #38bdf8; text-decoration: none;">Privacy Policy</a> &nbsp;|&nbsp; <a href="#" style="color: #38bdf8; text-decoration: none;">Termini di Servizio</a>
+        Contatti: info@hydroaegis.it | PEC: hydroaegis@pec.it
     </div>
 """, unsafe_allow_html=True)
+
+# Layout a colonne per centrare il pulsante nativo di Streamlit
+col_vuota_sx, col_link, col_vuota_dx = st.columns([4, 2, 4])
+with col_link:
+    st.page_link("pages/privacy.py", label="Informativa sulla Privacy", icon="🛡️")
