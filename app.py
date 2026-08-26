@@ -17,13 +17,6 @@ from reportlab.lib import colors
 from supabase import create_client, Client
 
 st.set_page_config(page_title="HydroAegis AI - Ispettore IA", page_icon="🔍", layout="wide")
-# --- BANNER DI TEST ---
-if st.secrets.get("AMBIENTE") == "TEST":
-    st.markdown("""
-        <div style='background-color: #ef4444; color: white; text-align: center; padding: 8px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; border: 2px solid #b91c1c;'>
-            🧪 ATTENZIONE: SEI NELL'AMBIENTE DI TEST - QUALSIASI MODIFICA AL DATABASE È REALE 🧪
-        </div>
-    """, unsafe_allow_html=True)
 
 # --- SCUDO CSS PER NASCONDERE STREAMLIT E ABBELLIRE LA UI ---
 st.markdown("""
@@ -568,29 +561,21 @@ else:
                 st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"), index=None, placeholder="Seleziona...")
+        tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"))
         
         formati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
         uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati)
 
         if uploaded_file is not None:
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: 
-                st.error("🚫 Formato non supportato. Carica un file video o audio.")
+            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: st.error("🚫 Formato non supportato. Carica un file video o audio.")
             else:
-                if (uploaded_file.size / (1024 * 1024)) > 2000: 
-                    st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
-                elif report_fatti >= limite_totale: 
-                    st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
+                if (uploaded_file.size / (1024 * 1024)) > 2000: st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
+                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
-                        
-                        if not tipo_ispezione:
-                            st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
-                            st.stop()
-                            
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
@@ -612,8 +597,22 @@ else:
                             except Exception as e:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
-
-                        modello_ideale = "models/gemini-1.5-pro"
+                        
+                        try:
+                            modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                        except Exception:
+                            modelli_disponibili = []
+                        
+                        modello_ideale = None
+                        
+                        for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro", "models/gemini-1.5-flash", "models/gemini-1.5-pro"]:
+                            if nome in modelli_disponibili:
+                                modello_ideale = nome
+                                break
+                                
+                        if not modello_ideale:
+                            modello_ideale = "models/gemini-3.6-flash"
+                            
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
@@ -624,6 +623,11 @@ else:
                             except Exception as e:
                                 st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
                                 st.stop()
+
+                        with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
+                            try:
+                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
+                                {bozza}
                                 
                                 Fai le seguenti operazioni in UN SINGOLO PASSAGGIO perfetto:
                                 1. Filtra ed elimina i falsi positivi.
