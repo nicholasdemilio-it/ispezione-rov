@@ -600,7 +600,7 @@ else:
                         
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                         
-                        with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
+                        
                             try:
                                 media_file = genai.upload_file(path=tmp_file_path)
                                 
