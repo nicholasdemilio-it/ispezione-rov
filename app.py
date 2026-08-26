@@ -306,7 +306,7 @@ else:
                         Spacer(1, 10),
                         Paragraph("<b>Luogo e Data:</b> _________________________ &nbsp;&nbsp;&nbsp;&nbsp; <b>Il Committente (Firma):</b> _________________________", style_testo_ord),
                         Spacer(1, 14),
-                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 C.C., il Committente dichiara di approvare specificamente le clausole: <b>3</b> (Pagamento e Rinnovo Automatico), <b>4</b> (Limitazione Responsabilità), <b>5</b> (Forza Maggiore) e <b>6</b> (Foro Competente).", style_doppia_firma),
+                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 C.C., il Committente dichiara di approvare specificamente le clausole: <b>3</b> (Pagamento e Rinnovo Automatico), <b>4</b> (Clausola Fiscale Pre-Apertura), <b>5</b> (Limitazione Responsabilità), <b>6</b> (Forza Maggiore) e <b>7</b> (Foro Competente).", style_doppia_firma),
                         Spacer(1, 8),
                         Paragraph("<b>Il Committente (Seconda Firma Obbligatoria):</b> _________________________", style_testo_ord),
                         Spacer(1, 20),
