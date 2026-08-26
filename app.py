@@ -616,7 +616,7 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                       try:
+                     try:
                             modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
                         except Exception:
                             modelli_disponibili = []
