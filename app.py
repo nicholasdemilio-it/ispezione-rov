@@ -571,6 +571,11 @@ else:
         tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"))
         
         formati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
+        st.markdown("<br>", unsafe_allow_html=True)
+        tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"), index=None, placeholder="Seleziona...")
+        
+        formati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
+        uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati)
         uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati)
 
         if uploaded_file is not None:
