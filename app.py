@@ -568,32 +568,37 @@ else:
                 st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"))
-        
-        formati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
-        st.markdown("<br>", unsafe_allow_html=True)
         tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"), index=None, placeholder="Seleziona...")
         
         formati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
         uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati)
-        uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati)
 
         if uploaded_file is not None:
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: st.error("🚫 Formato non supportato. Carica un file video o audio.")
+            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: 
+                st.error("🚫 Formato non supportato. Carica un file video o audio.")
             else:
-                if (uploaded_file.size / (1024 * 1024)) > 2000: st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
-                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
+                if (uploaded_file.size / (1024 * 1024)) > 2000: 
+                    st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
+                elif report_fatti >= limite_totale: 
+                    st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
+                        
+                        # Blocco 1: Verifica che l'utente abbia scelto l'ambiente
+                        if not tipo_ispezione:
+                            st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
+                            st.stop()
+                            
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
+                        # Blocco 2: Caricamento protetto per capire il vero errore di Google
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                             try:
                                 media_file = genai.upload_file(path=tmp_file_path)
@@ -607,24 +612,11 @@ else:
                                     st.stop()
                             
                             except Exception as e:
-                                st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
+                                st.error(f"⚠️ Errore di comunicazione con Google Cloud: {e}")
                                 st.stop()
                         
-                        try:
-                            modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        except Exception:
-                            modelli_disponibili = []
-                        
-                        modello_ideale = None
-                        
-                        for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro", "models/gemini-1.5-flash", "models/gemini-1.5-pro"]:
-                            if nome in modelli_disponibili:
-                                modello_ideale = nome
-                                break
-                                
-                        if not modello_ideale:
-                            modello_ideale = "models/gemini-3.6-flash"
-                            
+                        # Blocco 3: Assegnazione diretta e pulita di Gemini 1.5 Pro
+                        modello_ideale = "models/gemini-1.5-pro"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
