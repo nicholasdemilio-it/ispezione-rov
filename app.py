@@ -584,6 +584,12 @@ else:
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+                        if st.button("Avvia Analisi Enterprise", use_container_width=True):
+                        if not tipo_ispezione:
+                            st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
+                            st.stop()
+                            
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
                         
@@ -605,7 +611,7 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        modello_ideale = "gemini-1.5-pro-latest"
+                        modello_ideale = "gemini-1.5-flash"
                             
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
