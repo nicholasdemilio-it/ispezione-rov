@@ -616,7 +616,8 @@ else:
                                 st.stop()
                         
                         # Blocco 3: Assegnazione diretta e pulita di Gemini 1.5 Pro
-modello_ideale = "gemini-1.5-pro-latest"
+                        modello_ideale = "gemini-1.5-pro-latest"
+                        model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
