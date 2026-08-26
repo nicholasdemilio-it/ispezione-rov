@@ -612,7 +612,7 @@ else:
                         
                         modello_ideale = None
                         
-                        modello_ideale = "models/gemini-1.5-pro":
+                        modello_ideale = "models/gemini-1.5-pro"
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
                                 break
