@@ -618,20 +618,22 @@ else:
                         
                         try:
                             modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        except Exception:
+                            # Questa riga ci svelerà il mistero!
+                            st.info(f"Modelli sbloccati dalla tua API Key: {modelli_disponibili}")
+                        except Exception as e:
+                            st.error(f"Errore API Google: {e}")
                             modelli_disponibili = []
                             
                         modello_ideale = None
                         
-                        # Cerca dinamicamente il modello migliore sbloccato per la tua API Key
                         for nome in ["models/gemini-1.5-pro", "models/gemini-1.5-flash", "models/gemini-1.0-pro", "models/gemini-pro"]:
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
                                 break
                                 
-                        # Se la lista è vuota, usa il default che avevi all'inizio
                         if not modello_ideale:
-                            modello_ideale = "models/gemini-1.5-flash"
+                            # Se non trova niente, usa il nome base
+                            modello_ideale = "gemini-1.5-flash"
                             
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
