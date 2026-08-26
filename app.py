@@ -591,8 +591,7 @@ else:
                             st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
                             st.stop()
                             
-                        # Creazione e chiusura pulita del file temporaneo
-                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
                         
@@ -614,10 +613,17 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
 
-                        with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
+                        modello_ideale = "models/gemini-1.5-pro"
+                        model = genai.GenerativeModel(model_name=modello_ideale)
+                        
+                        with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
-                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
-                                {bozza}
+                                time.sleep(2)
+                                ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
+                                bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
+                            except Exception as e:
+                                st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
+                                st.stop()
                                 
                                 Fai le seguenti operazioni in UN SINGOLO PASSAGGIO perfetto:
                                 1. Filtra ed elimina i falsi positivi.
