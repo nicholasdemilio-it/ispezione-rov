@@ -633,6 +633,9 @@ else:
                         if not modello_ideale:
                             modello_ideale = "models/gemini-3.6-flash"
                         
+                        # --- AGGIUNGI QUESTA RIGA QUI ---
+                        model = genai.GenerativeModel(model_name=modello_ideale)
+                        
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
                                 time.sleep(2)
