@@ -1,4 +1,4 @@
-import streamlit as st
+uimport streamlit as st
 import google.generativeai as genai
 import tempfile
 import os
@@ -575,16 +575,19 @@ else:
 
         if uploaded_file is not None:
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: st.error("🚫 Formato non supportato. Carica un file video o audio.")
+            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: 
+                st.error("🚫 Formato non supportato. Carica un file video o audio.")
             else:
-                if (uploaded_file.size / (1024 * 1024)) > 2000: st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
-                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
+                if (uploaded_file.size / (1024 * 1024)) > 2000: 
+                    st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
+                elif report_fatti >= limite_totale: 
+                    st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-                        if st.button("Avvia Analisi Enterprise", use_container_width=True):
+                        
+                        # Controllo di sicurezza se l'ambiente non è stato selezionato
                         if not tipo_ispezione:
                             st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
                             st.stop()
@@ -594,6 +597,8 @@ else:
                             tmp_file_path = tmp_file.name
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
+                        
+                        with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                         
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                             try:
