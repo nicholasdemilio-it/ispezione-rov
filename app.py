@@ -587,7 +587,6 @@ else:
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         
-                        # Controllo di sicurezza se l'ambiente non è stato selezionato
                         if not tipo_ispezione:
                             st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
                             st.stop()
@@ -599,6 +598,7 @@ else:
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
+                            video_file = genai.upload_file(path=tmp_file_path)
                         
                         
                             try:
