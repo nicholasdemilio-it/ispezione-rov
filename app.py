@@ -615,8 +615,15 @@ else:
                                 st.error(f"⚠️ Errore di comunicazione con Google Cloud: {e}")
                                 st.stop()
                         
-                        # Blocco 3: Assegnazione diretta e pulita di Gemini 1.5 Pro
-                        modello_ideale = "gemini-1.5-pro"
+                        # Blocco 3: Assegnazione Dinamica del Modello (Anti-Deprecamento)
+                        try:
+                            # Ottiene la lista dei modelli attualmente attivi e supportati
+                            modelli_attivi = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                            # Seleziona in automatico il primo modello "pro" disponibile nell'elenco
+                            modello_ideale = next((m for m in modelli_attivi if "pro" in m.lower()), modelli_attivi[0])
+                        except Exception:
+                            modello_ideale = "gemini-2.5-pro" # Fallback di sicurezza
+                        
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
