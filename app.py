@@ -597,24 +597,8 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
+                        with st.spinner("Caricamento del video in corso..."):
                             video_file = genai.upload_file(path=tmp_file_path)
-                        
-                        
-                            try:
-                                media_file = genai.upload_file(path=tmp_file_path)
-                                
-                                while media_file.state.name == "PROCESSING":
-                                    time.sleep(3)
-                                    media_file = genai.get_file(media_file.name)
-                                
-                                if media_file.state.name == "FAILED":
-                                    st.error("🚫 Errore Google: Impossibile elaborare il file. Potrebbe essere danneggiato o in un formato non supportato.")
-                                    st.stop()
-                            
-                            except Exception as e:
-                            st.error("⚠️ Errore di connessione con Google. Riprova tra un istante.")
-                            st.stop()
                         
                         modello_ideale = "models/gemini-1.5-pro"
                         model = genai.GenerativeModel(model_name=modello_ideale)
