@@ -607,7 +607,7 @@ else:
                             try:
                                 time.sleep(2)
                                 ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
-                                bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
+                                bozza = model.generate_content([video_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
                             except Exception as e:
                                 st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
                                 st.stop()
