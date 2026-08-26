@@ -1,5 +1,6 @@
 streamlit
-google-generativeai
+google-generativeai>=0.7.2
+google-api-python-client>=2.137.0
 reportlab
 supabase
 python-dateutil
