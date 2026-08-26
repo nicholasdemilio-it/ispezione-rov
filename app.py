@@ -612,7 +612,7 @@ else:
                         
                         modello_ideale = None
                         
-                        for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro", "models/gemini-1.5-flash", "models/gemini-1.5-pro"]:
+                        modello_ideale = "models/gemini-1.5-pro":
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
                                 break
