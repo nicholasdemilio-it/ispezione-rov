@@ -592,27 +592,26 @@ else:
                             st.stop()
                             
                         # Creazione e chiusura pulita del file temporaneo
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-                            tmp_file.write(uploaded_file.getvalue())
+                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
+                            tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
-
-                        # Calcolo dell'hash forense in sicurezza
+                        
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        # Upload protetto su Google
-                        with st.spinner("Caricamento del video su Google in corso..."):
-                            video_file = genai.upload_file(path=tmp_file_path)
-                        
-                        modello_ideale = "models/gemini-1.5-pro"
-                        model = genai.GenerativeModel(model_name=modello_ideale)
-                        
-                        with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
+                        with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                             try:
-                                time.sleep(2)
-                                ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
-                                bozza = model.generate_content([video_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
+                                media_file = genai.upload_file(path=tmp_file_path)
+                                
+                                while media_file.state.name == "PROCESSING":
+                                    time.sleep(3)
+                                    media_file = genai.get_file(media_file.name)
+                                
+                                if media_file.state.name == "FAILED":
+                                    st.error("🚫 Errore Google: Impossibile elaborare il file. Potrebbe essere danneggiato o in un formato non supportato.")
+                                    st.stop()
+                            
                             except Exception as e:
-                                st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
+                                st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
 
                         with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
