@@ -623,17 +623,17 @@ else:
                             
                         modello_ideale = None
                         
-                        # Ora cerchiamo tra i TUOI modelli potentissimi!
-                        for nome in ["models/gemini-2.5-pro", "models/gemini-3.6-flash", "models/gemini-3.7-flash", "models/gemini-2.5-flash"]:
+                        # Ascoltiamo il suggerimento di Google e puntiamo al 3.1 Pro!
+                        for nome in ["models/gemini-3.1-pro-preview", "models/gemini-3.6-flash", "models/gemini-3.7-flash"]:
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
                                 break
                                 
-                        # Fallback di sicurezza assicurato
+                        # Fallback di sicurezza
                         if not modello_ideale:
                             modello_ideale = "models/gemini-3.6-flash"
-                        
-                        # --- AGGIUNGI QUESTA RIGA QUI ---
+                            
+                        # Accendiamo il motore
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
