@@ -623,7 +623,7 @@ else:
                             
                         modello_ideale = None
                         
-                        # Puntiamo ai modelli PRO (ora che non hai limiti!)
+                        # Motori Pro Enterprise sbloccati!
                         for nome in ["models/gemini-2.5-pro", "models/gemini-3.1-pro-preview", "models/gemini-1.5-pro"]:
                             if nome in modelli_disponibili:
                                 modello_ideale = nome
