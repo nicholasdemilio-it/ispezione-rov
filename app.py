@@ -613,23 +613,10 @@ else:
                                     st.stop()
                             
                             except Exception as e:
-                            st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
+                            st.error("⚠️ Errore di connessione con Google. Riprova tra un istante.")
                             st.stop()
                         
-                        try:
-                            modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        except Exception:
-                            modelli_disponibili = []
-                            
-                        modello_ideale = None
-                        for nome in ["models/gemini-2.5-pro", "models/gemini-3.1-pro-preview", "models/gemini-1.5-pro"]:
-                            if nome in modelli_disponibili:
-                                modello_ideale = nome
-                                break
-                                
-                        if not modello_ideale:
-                            modello_ideale = "models/gemini-1.5-pro"
-                            
+                        modello_ideale = "models/gemini-1.5-pro"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
