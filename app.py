@@ -591,13 +591,16 @@ else:
                             st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
                             st.stop()
                             
+                        # Creazione e chiusura pulita del file temporaneo
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-                            tmp_file.write(uploaded_file.read())
+                            tmp_file.write(uploaded_file.getvalue())
                             tmp_file_path = tmp_file.name
-                        
+
+                        # Calcolo dell'hash forense in sicurezza
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        with st.spinner("Caricamento del video in corso..."):
+                        # Upload protetto su Google
+                        with st.spinner("Caricamento del video su Google in corso..."):
                             video_file = genai.upload_file(path=tmp_file_path)
                         
                         modello_ideale = "models/gemini-1.5-pro"
