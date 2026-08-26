@@ -318,6 +318,61 @@ else:
                 st.download_button("⬇️ SCARICA IL CONTRATTO B2B", data=st.session_state['pdf_ord_bytes'], file_name=st.session_state['pdf_ord_name'], mime="application/pdf")
 
         st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("🚀 Generatore Accordo Early-Bird (7 Giorni Prova + Abbonamento)", expanded=False):
+            st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Usa questo modulo per i primissimi clienti. Prevede 7 giorni di prova gratuiti, scaduti i quali si attiva in automatico l'abbonamento. Include la clausola di P.IVA in via di attribuzione.</p>", unsafe_allow_html=True)
+            with st.form("form_early_bird"):
+                c_eb1, c_eb2 = st.columns(2)
+                with c_eb1:
+                    cli_nome_eb = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl", key="eb_nome")
+                    cli_piva_eb = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890", key="eb_piva")
+                    cli_email_eb = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it", key="eb_email")
+                with c_eb2:
+                    tipo_piano_eb = st.selectbox("Formula Successiva (Post-Prova)", ("Abbonamento Annuale (Canone agevolato)", "Abbonamento Mensile Flessibile"), key="eb_piano")
+                    prezzo_mensile_eb = st.number_input("Canone Netto Post-Prova (€)", min_value=100, max_value=5000, value=690, key="eb_prezzo")
+                    report_inclusi_eb = st.number_input("Report mensili inclusi", min_value=10, max_value=500, value=50, key="eb_report")
+                
+                btn_genera_eb = st.form_submit_button("⚙️ Prepara Accordo Early-Bird in PDF", use_container_width=True)
+
+            if btn_genera_eb:
+                if cli_nome_eb and cli_piva_eb:
+                    eb_filename = f"Accordo_Prova_Vincolata_{cli_nome_eb.replace(' ', '_')}.pdf"
+                    doc_eb = SimpleDocTemplate(eb_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=30, bottomMargin=30)
+                    
+                    # Usa gli stili definiti in precedenza (li ricreiamo per sicurezza nel blocco)
+                    styles_eb = getSampleStyleSheet()
+                    style_titolo_eb = ParagraphStyle('TitleEB', parent=styles_eb['Heading1'], fontSize=13, leading=16, spaceAfter=10, textColor=colors.HexColor("#0b1a30"))
+                    style_testo_eb = ParagraphStyle('TextEB', parent=styles_eb['Normal'], fontSize=8.5, leading=11, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
+                    style_fiscale_eb = ParagraphStyle('FiscaleEB', parent=styles_eb['Normal'], fontSize=7.5, leading=9.5, spaceAfter=4, textColor=colors.HexColor("#64748b"))
+                    style_firma_eb = ParagraphStyle('FirmaEB', parent=styles_eb['Normal'], fontSize=7.5, leading=9.5, spaceAfter=8, textColor=colors.HexColor("#334155"), fontName="Helvetica-Oblique")
+                    
+                    story_eb = [
+                        Paragraph("<b>ACCORDO DI PROVA (TRIAL) CON CONVERSIONE IN ABBONAMENTO SaaS B2B</b>", style_titolo_eb),
+                        Paragraph("<b>HydroAegis AI – Piattaforma IA per Ispezioni e Certificazione Forense</b>", style_testo_eb),
+                        Spacer(1, 4),
+                        Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome_eb}<br/>• P.IVA / C.F.: {cli_piva_eb}<br/>• Email Referente: {cli_email_eb}", style_testo_eb),
+                        Spacer(1, 4),
+                        Paragraph("<b>2. PERIODO DI PROVA GRATUITO (FASE 1):</b><br/>Il Fornitore concede al Committente un periodo di prova a titolo totalmente gratuito della durata di <b>7 (sette) giorni solari</b> a partire dall'attivazione delle credenziali. Durante tale periodo, il Committente potrà testare le funzionalità della piattaforma senza alcun onere.", style_testo_eb),
+                        Spacer(1, 4),
+                        Paragraph(f"<b>3. SOTTOSCRIZIONE AUTOMATICA (FASE 2):</b><br/>In assenza di formale disdetta inviata via email/PEC entro il settimo giorno di prova, il presente accordo <b>si convertirà automaticamente in un abbonamento a pagamento</b> con le seguenti condizioni:<br/>• Formula Commerciale: <b>{tipo_piano_eb}</b><br/>• Volume Incluso: Fino a <b>{report_inclusi_eb} Report Certificati</b> mensili.<br/>• <b>CANONE IMPONIBILE: € {prezzo_mensile_eb:.2f} / mese</b>", style_testo_eb),
+                        Spacer(1, 4),
+                        Paragraph("<b>4. CLAUSOLA FISCALE PRE-APERTURA:</b><br/>Il Committente prende formalmente atto che l'entità giuridica del Fornitore (HydroAegis) è attualmente in fase di formale costituzione e attribuzione del numero di Partita IVA. La prima fatturazione utile verrà emessa non appena la posizione fiscale sarà attiva, inglobando i canoni maturati a partire dalla data di conversione dell'abbonamento.", style_testo_eb),
+                        Spacer(1, 4),
+                        Paragraph("<b>5. NOTE LEGALI E LIMITAZIONE DI RESPONSABILITÀ:</b><br/>Il software costituisce uno strumento di supporto decisionale. La validazione tecnica dei dati e la classificazione alla norma EN 13508-2 restano ad esclusivo carico del tecnico abilitato del Committente. I dati inseriti non saranno utilizzati per l'addestramento di modelli IA pubblici (Privacy e GDPR).", style_testo_eb),
+                        Spacer(1, 10),
+                        Paragraph("<b>Luogo e Data:</b> _________________________ &nbsp;&nbsp;&nbsp;&nbsp; <b>Il Committente (Firma):</b> _________________________", style_testo_eb),
+                        Spacer(1, 14),
+                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 C.C., il Committente dichiara di approvare specificamente le clausole: <b>3</b> (Sottoscrizione Automatica), <b>4</b> (Clausola Fiscale Pre-Apertura) e <b>5</b> (Limitazione di Responsabilità).", style_firma_eb),
+                        Spacer(1, 8),
+                        Paragraph("<b>Il Committente (Seconda Firma Obbligatoria):</b> _________________________", style_testo_eb),
+                    ]
+                    
+                    doc_eb.build(story_eb)
+                    with open(eb_filename, "rb") as f_eb:
+                        st.session_state['pdf_eb_bytes'] = f_eb.read()
+                        st.session_state['pdf_eb_name'] = eb_filename
+                        
+            if 'pdf_eb_bytes' in st.session_state:
+                st.download_button("⬇️ SCARICA ACCORDO EARLY-BIRD", data=st.session_state['pdf_eb_bytes'], file_name=st.session_state['pdf_eb_name'], mime="application/pdf")
         
         with st.expander("📦 Gestione Ricarica Crediti Extra (Pacchetti Report)", expanded=False):
             try:
