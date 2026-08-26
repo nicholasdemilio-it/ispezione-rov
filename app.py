@@ -330,6 +330,7 @@ else:
                     tipo_piano_eb = st.selectbox("Formula Successiva (Post-Prova)", ("Abbonamento Annuale (Canone agevolato)", "Abbonamento Mensile Flessibile"), key="eb_piano")
                     prezzo_mensile_eb = st.number_input("Canone Netto Post-Prova (€)", min_value=100, max_value=5000, value=690, key="eb_prezzo")
                     report_inclusi_eb = st.number_input("Report mensili inclusi", min_value=10, max_value=500, value=50, key="eb_report")
+                    crediti_prova_eb = st.number_input("Crediti Gratuiti (Prova)", min_value=1, max_value=20, value=3, key="eb_prova")
                 
                 btn_genera_eb = st.form_submit_button("⚙️ Prepara Accordo Early-Bird in PDF", use_container_width=True)
 
