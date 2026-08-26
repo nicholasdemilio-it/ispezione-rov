@@ -605,20 +605,7 @@ else:
                                 st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
                                 st.stop()
                         
-                        try:
-                            modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        except Exception:
-                            modelli_disponibili = []
-                        
-                        modello_ideale = None
-                        
                         modello_ideale = "models/gemini-1.5-pro"
-                            if nome in modelli_disponibili:
-                                modello_ideale = nome
-                                break
-                                
-                        if not modello_ideale:
-                            modello_ideale = "models/gemini-3.6-flash"
                             
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
