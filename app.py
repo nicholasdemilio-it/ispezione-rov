@@ -631,6 +631,7 @@ else:
                                 2. DETTAGLIO CLINICO: Non essere riassuntivo. Per ogni anomalia descrivi in modo esteso: tipologia di difetto, posizione a orologio (es. da ore 12 a ore 3), gravità visiva, stato dei giunti e potenziali conseguenze (es. rischio di collasso, ostruzione o infiltrazione).
                                 3. ZERO ALLUCINAZIONI: Sii analitico e veritiero. Basati unicamente sui pixel del video. Se un dato o un pozzetto non è a schermo, non dedurlo e non inventarlo.
                                 4. FORMATO: Elenca in ordine cronologico indicando [Minuto esatto] - [Distanza rilevata a schermo] - [Difetto e Descrizione Tecnica Estesa].
+                                5. SISTEMA METRICO: Converti TASSATIVAMENTE tutte le unità di misura nel Sistema Metrico Decimale. Le distanze devono essere in Metri (m) e i diametri in Millimetri (mm). VIETATO USARE Piedi (ft) o Pollici (inch).
                                 """
                                 bozza = model.generate_content([media_file, prompt_fase1]).text
                             except Exception as e:
@@ -645,16 +646,17 @@ else:
                                 Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura, senza usare asterischi o cancelletti per i titoli:
 
                                 SEZIONE 1: RILEVAZIONE ANOMALIE
-                                Genera un elenco puntato strutturato per ogni singola anomalia trovata, seguendo esattamente questo formato riga per riga:
-                                • [Distanza progressiva] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione tecnica concisa del difetto].
+                                1. Inizia SEMPRE la sezione scrivendo la tratta esatta: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
+                                2. Genera l'elenco puntato strutturato. È OBBLIGATORIO andare a capo (creare una nuova riga) prima di ogni punto elenco. Segui esattamente questo formato:
+                                • [Distanza progressiva in metri (m)] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione tecnica].
 
                                 SEZIONE 2: CLASSIFICAZIONE IQI
                                 Scrivi un singolo paragrafo tecnico e conciso spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5) basato sulla gravità dei difetti.
 
                                 SEZIONE 3: VALUTAZIONE STRUTTURALE
-                                Fai un'analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive consigliate (es. risanamento trenchless).
+                                Fai un'analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive consigliate. Anche qui, vai sempre a capo prima di ogni punto elenco.
 
-                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie, usa solo l'elenco puntato strutturato. Correggi ogni errore ortografico.
+                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie. Usa SOLO il sistema metrico decimale. Assicurati che ogni pallino (•) vada su una riga separata. Correggi ogni errore ortografico.
                                 """
                                 testo_generato = model.generate_content([media_file, prompt_2]).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
