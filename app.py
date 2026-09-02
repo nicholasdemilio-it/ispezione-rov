@@ -642,13 +642,19 @@ else:
                                 prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
                                 {bozza}
                                 
-                                Fai le seguenti operazioni in UN SINGOLO PASSAGGIO perfetto:
-                                1. Filtra ed elimina i falsi positivi.
-                                2. Assegna a ogni difetto il codice normativo EN 13508-2 pertinente.
-                                3. Calcola l'Indice di Priorità d'Intervento (IQI).
-                                4. Struttura chiaramente in 3 sezioni: RILEVAZIONE ANOMALIE, CLASSIFICAZIONE IQI, VALUTAZIONE STRUTTURALE.
-                                5. CORREZIONE ORTOGRAFICA OBBLIGATORIA.
-                                6. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, CANCELLETTI O MARKDOWN. Scrivi puro testo professionale formattato in paragrafi.
+                                Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura, senza usare asterischi o cancelletti per i titoli:
+
+                                SEZIONE 1: RILEVAZIONE ANOMALIE
+                                Genera un elenco puntato strutturato per ogni singola anomalia trovata, seguendo esattamente questo formato riga per riga:
+                                • [Distanza progressiva] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione tecnica concisa del difetto].
+
+                                SEZIONE 2: CLASSIFICAZIONE IQI
+                                Scrivi un singolo paragrafo tecnico e conciso spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5) basato sulla gravità dei difetti.
+
+                                SEZIONE 3: VALUTAZIONE STRUTTURALE
+                                Fai un'analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive consigliate (es. risanamento trenchless).
+
+                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie, usa solo l'elenco puntato strutturato. Correggi ogni errore ortografico.
                                 """
                                 testo_generato = model.generate_content([media_file, prompt_2]).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
