@@ -622,8 +622,17 @@ else:
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
                                 time.sleep(2)
-                                ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
-                                bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
+                                ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                                
+                                prompt_fase1 = f"""{ruolo}
+                                Analizza il video effettuando una perizia forense estremamente dettagliata. 
+                                REGOLE TASSATIVE:
+                                1. TELEMETRIA E OCR: Leggi tutte le scritte in sovrimpressione nel video. Estrai tassativamente i nomi esatti dei pozzetti di partenza/arrivo (es. H10...) e le distanze in metri/piedi.
+                                2. DETTAGLIO CLINICO: Non essere riassuntivo. Per ogni anomalia descrivi in modo esteso: tipologia di difetto, posizione a orologio (es. da ore 12 a ore 3), gravità visiva, stato dei giunti e potenziali conseguenze (es. rischio di collasso, ostruzione o infiltrazione).
+                                3. ZERO ALLUCINAZIONI: Sii analitico e veritiero. Basati unicamente sui pixel del video. Se un dato o un pozzetto non è a schermo, non dedurlo e non inventarlo.
+                                4. FORMATO: Elenca in ordine cronologico indicando [Minuto esatto] - [Distanza rilevata a schermo] - [Difetto e Descrizione Tecnica Estesa].
+                                """
+                                bozza = model.generate_content([media_file, prompt_fase1]).text
                             except Exception as e:
                                 st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
                                 st.stop()
