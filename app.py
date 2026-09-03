@@ -17,13 +17,7 @@ from reportlab.lib import colors
 from supabase import create_client, Client
 
 st.set_page_config(page_title="HydroAegis AI - Ispettore IA", page_icon="🔍", layout="wide")
-# --- BANNER DI TEST ---
-if st.secrets.get("AMBIENTE") == "TEST":
-    st.markdown("""
-        <div style='background-color: #ef4444; color: white; text-align: center; padding: 8px; font-weight: bold; border-radius: 8px; margin-bottom: 15px; border: 2px solid #b91c1c;'>
-            🧪 ATTENZIONE: SEI NELL'AMBIENTE DI TEST - QUALSIASI MODIFICA AL DATABASE È REALE 🧪
-        </div>
-    """, unsafe_allow_html=True)
+
 
 # --- SCUDO CSS PER NASCONDERE STREAMLIT E ABBELLIRE LA UI ---
 st.markdown("""
