@@ -643,20 +643,26 @@ else:
                                 prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
                                 {bozza}
                                 
-                                Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura, senza usare asterischi o cancelletti per i titoli:
+                                Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura:
 
                                 SEZIONE 1: RILEVAZIONE ANOMALIE
-                                1. Inizia SEMPRE la sezione scrivendo la tratta esatta: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
-                                2. Genera l'elenco puntato strutturato. È OBBLIGATORIO andare a capo (creare una nuova riga) prima di ogni punto elenco. Segui esattamente questo formato:
-                                • [Distanza progressiva in metri (m)] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione tecnica].
+                                1. Inizia scrivendo: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
+                                2. Genera l'elenco puntato. Usa ESATTAMENTE questo formato riga per riga (scrivi l'intero punto elenco su una sola riga continua, SENZA ritorni a capo interni):
+                                • [Distanza in metri (m)] | [Codice EN 13508-2 CORRETTO] | [Posizione Orologio] - [Descrizione tecnica].
+                                
+                                ATTENZIONE AI CODICI (REGOLA FERREA): Devi usare i codici corretti della norma europea!
+                                - Fessure/Fratture: Famiglia B (BAB, BAC, BAA, ecc.)
+                                - Allacci/Innesti: Famiglia T (TBA, TBB, TBC, ecc.)
+                                - Livelli Acqua/Inventario: Famiglia M (MWA, MWB, ecc.)
+                                Non assegnare MAI un codice strutturale (es. BAC, BAF) a un livello idrico o a un allaccio!
 
                                 SEZIONE 2: CLASSIFICAZIONE IQI
-                                Scrivi un singolo paragrafo tecnico e conciso spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5) basato sulla gravità dei difetti.
+                                Scrivi un singolo paragrafo tecnico spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5).
 
                                 SEZIONE 3: VALUTAZIONE STRUTTURALE
-                                Fai un'analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive consigliate. Anche qui, vai sempre a capo prima di ogni punto elenco.
+                                Analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive.
 
-                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie. Usa SOLO il sistema metrico decimale. Assicurati che ogni pallino (•) vada su una riga separata. Correggi ogni errore ortografico.
+                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie. Usa SOLO il sistema metrico decimale. Correggi ogni errore ortografico.
                                 """
                                 testo_generato = model.generate_content([media_file, prompt_2]).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
