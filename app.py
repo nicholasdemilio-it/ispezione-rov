@@ -162,12 +162,17 @@ else:
                         bg_tk = "ticket-row" if t.get('stato') == 'Aperto' else "ticket-row ticket-resolved"
                         stato_icon = "🟠 APERTO" if t.get('stato') == 'Aperto' else "🟢 RISOLTO"
                         
-                        # Formattazione automatica della data e ora
+                        # Formattazione automatica della data e ora con Fuso Orario Italiano
                         data_raw = t.get('created_at', 'N/D')
                         if data_raw and data_raw != 'N/D':
                             try:
-                                data_formattata = f"{data_raw[8:10]}/{data_raw[5:7]}/{data_raw[0:4]} alle {data_raw[11:16]}"
-                            except:
+                                # Converte l'orario del server (UTC) in orario italiano
+                                if data_raw.endswith("Z"):
+                                    data_raw = data_raw[:-1] + "+00:00"
+                                dt_utc = datetime.fromisoformat(data_raw)
+                                dt_ita = dt_utc.astimezone(ZoneInfo("Europe/Rome"))
+                                data_formattata = dt_ita.strftime("%d/%m/%Y alle %H:%M")
+                            except Exception as e:
                                 data_formattata = data_raw
                         else:
                             data_formattata = "Data sconosciuta"
