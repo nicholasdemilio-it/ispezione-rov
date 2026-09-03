@@ -164,7 +164,7 @@ else:
                         
                         # Formattazione automatica della data e ora
                         data_raw = t.get('created_at', 'N/D')
-                        if data_raw != 'N/D':
+                        if data_raw and data_raw != 'N/D':
                             try:
                                 data_formattata = f"{data_raw[8:10]}/{data_raw[5:7]}/{data_raw[0:4]} alle {data_raw[11:16]}"
                             except:
@@ -183,7 +183,6 @@ else:
                                 <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 8px;">
                                     <span style="color: #38bdf8;">🕒 <b>Ricevuto il:</b> {data_formattata}</span> <br>
                                     <b>Oggetto:</b> {t.get('tipo_problema', 'N/D')} <br>
-                        
                                     <b>Contatto:</b> {t.get('preferenza_contatto', 'N/D')} - {t.get('recapito', 'N/D')}
                                 </div>
                                 <div style="font-size: 13px; color: #e2e8f0; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
