@@ -760,7 +760,7 @@ else:
                     supabase.table("ticket_assistenza").insert({"codice_licenza": st.session_state['codice_licenza'], "cliente": cliente_nome, "tipo_problema": tipo_problema, "preferenza_contatto": preferenza_contatto, "recapito": recapito_utente, "descrizione": descrizione_problema, "stato": "Aperto"}).execute()
                     st.success("✅ Richiesta inviata con successo! Il nostro team tecnico ha preso in carico la segnalazione. Puoi chiudere questa finestra.")
                 except Exception as e:
-                    st.error(f"⚠️ Errore nell'invio della richiesta. DETTAGLIO TECNICO: {e}")
+                    st.error("⚠️ Errore di connessione. Impossibile inviare la richiesta, riprova più tardi.")
             else:
                 st.warning("⚠️ Compila tutti i campi (recapito e descrizione) prima di inviare la richiesta.")
 
