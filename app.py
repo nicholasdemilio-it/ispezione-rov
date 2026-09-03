@@ -18,6 +18,7 @@ from supabase import create_client, Client
 
 st.set_page_config(page_title="HydroAegis AI - Ispettore IA", page_icon="🔍", layout="wide")
 
+
 # --- SCUDO CSS PER NASCONDERE STREAMLIT E ABBELLIRE LA UI ---
 st.markdown("""
     <style>
@@ -561,27 +562,37 @@ else:
                 st.rerun()
 
         st.markdown("<br>", unsafe_allow_html=True)
-        tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"))
+        tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"), index=None, placeholder="Seleziona...")
         
         formati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
         uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati)
 
         if uploaded_file is not None:
             file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: st.error("🚫 Formato non supportato. Carica un file video o audio.")
+            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: 
+                st.error("🚫 Formato non supportato. Carica un file video o audio.")
             else:
-                if (uploaded_file.size / (1024 * 1024)) > 2000: st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
-                elif report_fatti >= limite_totale: st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
+                if (uploaded_file.size / (1024 * 1024)) > 2000: 
+                    st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
+                elif report_fatti >= limite_totale: 
+                    st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
                 else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
+                        
+                        # Blocco 1: Verifica che l'utente abbia scelto l'ambiente
+                        if not tipo_ispezione:
+                            st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
+                            st.stop()
+                            
                         with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
                             tmp_file.write(uploaded_file.read())
                             tmp_file_path = tmp_file.name
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
+                        # Blocco 2: Caricamento protetto per capire il vero errore di Google
                         with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
                             try:
                                 media_file = genai.upload_file(path=tmp_file_path)
@@ -595,31 +606,28 @@ else:
                                     st.stop()
                             
                             except Exception as e:
-                                st.error("⚠️ Tempo di connessione scaduto (Timeout). Il server di Google è temporaneamente sovraccarico o la rete è instabile. Attendi 1 minuto e riprova.")
+                                st.error(f"⚠️ Errore di comunicazione con Google Cloud: {e}")
                                 st.stop()
                         
-                        try:
-                            modelli_disponibili = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        except Exception:
-                            modelli_disponibili = []
-                        
-                        modello_ideale = None
-                        
-                        for nome in ["models/gemini-3.6-flash", "models/gemini-3.6-pro", "models/gemini-1.5-flash", "models/gemini-1.5-pro"]:
-                            if nome in modelli_disponibili:
-                                modello_ideale = nome
-                                break
-                                
-                        if not modello_ideale:
-                            modello_ideale = "models/gemini-3.6-flash"
-                            
+                        # Blocco 3: Modello Ufficiale Consigliato dall'API Google
+                        modello_ideale = "gemini-3.1-pro-preview"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
                             try:
                                 time.sleep(2)
-                                ruolo = "Sei un Ispettore Tecnico Offshore. Identifica tutte le anomalie nel video ROV." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile. Identifica tutte le anomalie strutturali nel video."
-                                bozza = model.generate_content([media_file, f"{ruolo}\nElenca le anomalie in ordine cronologico con il minuto esatto."]).text
+                                ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                                
+                                prompt_fase1 = f"""{ruolo}
+                                Analizza il video effettuando una perizia forense estremamente dettagliata. 
+                                REGOLE TASSATIVE:
+                                1. TELEMETRIA E OCR: Leggi tutte le scritte in sovrimpressione nel video. Estrai tassativamente i nomi esatti dei pozzetti di partenza/arrivo (es. H10...) e le distanze in metri/piedi.
+                                2. DETTAGLIO CLINICO: Non essere riassuntivo. Per ogni anomalia descrivi in modo esteso: tipologia di difetto, posizione a orologio (es. da ore 12 a ore 3), gravità visiva, stato dei giunti e potenziali conseguenze (es. rischio di collasso, ostruzione o infiltrazione).
+                                3. ZERO ALLUCINAZIONI: Sii analitico e veritiero. Basati unicamente sui pixel del video. Se un dato o un pozzetto non è a schermo, non dedurlo e non inventarlo.
+                                4. FORMATO: Elenca in ordine cronologico indicando [Minuto esatto] - [Distanza rilevata a schermo] - [Difetto e Descrizione Tecnica Estesa].
+                                5. SISTEMA METRICO: Converti TASSATIVAMENTE tutte le unità di misura nel Sistema Metrico Decimale. Le distanze devono essere in Metri (m) e i diametri in Millimetri (mm). VIETATO USARE Piedi (ft) o Pollici (inch).
+                                """
+                                bozza = model.generate_content([media_file, prompt_fase1]).text
                             except Exception as e:
                                 st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
                                 st.stop()
@@ -629,13 +637,26 @@ else:
                                 prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
                                 {bozza}
                                 
-                                Fai le seguenti operazioni in UN SINGOLO PASSAGGIO perfetto:
-                                1. Filtra ed elimina i falsi positivi.
-                                2. Assegna a ogni difetto il codice normativo EN 13508-2 pertinente.
-                                3. Calcola l'Indice di Priorità d'Intervento (IQI).
-                                4. Struttura chiaramente in 3 sezioni: RILEVAZIONE ANOMALIE, CLASSIFICAZIONE IQI, VALUTAZIONE STRUTTURALE.
-                                5. CORREZIONE ORTOGRAFICA OBBLIGATORIA.
-                                6. ASSOLUTAMENTE VIETATO USARE ASTERISCHI, CANCELLETTI O MARKDOWN. Scrivi puro testo professionale formattato in paragrafi.
+                                Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura:
+
+                                SEZIONE 1: RILEVAZIONE ANOMALIE
+                                1. Inizia scrivendo: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
+                                2. Genera l'elenco puntato. Usa ESATTAMENTE questo formato riga per riga (scrivi l'intero punto elenco su una sola riga continua, SENZA ritorni a capo interni):
+                                • [Distanza in metri (m)] | [Codice EN 13508-2 CORRETTO] | [Posizione Orologio] - [Descrizione tecnica].
+                                
+                                ATTENZIONE AI CODICI (REGOLA FERREA): Devi usare i codici corretti della norma europea!
+                                - Fessure/Fratture: Famiglia B (BAB, BAC, BAA, ecc.)
+                                - Allacci/Innesti: Famiglia T (TBA, TBB, TBC, ecc.)
+                                - Livelli Acqua/Inventario: Famiglia M (MWA, MWB, ecc.)
+                                Non assegnare MAI un codice strutturale (es. BAC, BAF) a un livello idrico o a un allaccio!
+
+                                SEZIONE 2: CLASSIFICAZIONE IQI
+                                Scrivi un singolo paragrafo tecnico spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5).
+
+                                SEZIONE 3: VALUTAZIONE STRUTTURALE
+                                Analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive.
+
+                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie. Usa SOLO il sistema metrico decimale. Correggi ogni errore ortografico.
                                 """
                                 testo_generato = model.generate_content([media_file, prompt_2]).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
