@@ -80,7 +80,11 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'\*(.*?)\*', r'\1', testo)
     testo = re.sub(r'__(.*?)__', r'\1', testo)
     testo = re.sub(r'`(.*?)`', r'\1', testo)
+    
+    # FORZATURA: Se una riga inizia con un numero e una "m", aggiunge il pallino in automatico
+    testo = re.sub(r'^\s*(\d+\.\d+\s*m\s*\|)', r'• \1', testo, flags=re.MULTILINE)
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
+    
     return testo.strip()
 
 def estrai_frame_salienti(video_path, frame_per_secondo=1):
@@ -701,24 +705,25 @@ else:
                         # --- FASE 3: QA e Generazione Referto ---        
                         with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
                             try:
-                                prompt_2 = f"""Sei un Ingegnere Capo specializzato. Unisci questi appunti in un RAPPORTO TECNICO CERTIFICATO.
-                            
-                            REGOLE TASSATIVE:
-                            1. COPIA TUTTO: Inserisci TUTTE le anomalie degli appunti. Vietato riassumere, omettere o accorpare.
-                            2. NESSUN SEGNAPOSTO: Non usare MAI diciture fittizie come [Data Odierna] o stringhe matematiche di conversione.
-                            3. FORMATO ELENCO RIGIDO: OGNI riga delle anomalie DEVE INIZIARE TASSATIVAMENTE con il simbolo "• " (Punto elenco e spazio).
-                            
-                            SEZIONE 1: RILEVAZIONE ANOMALIE
-                            Tratta ispezionata: dal Pozzetto [Nodo] al Pozzetto [Nodo].
-                            (Elenca le anomalie incolonnate usando ESATTAMENTE questo formato):
-                            • [Distanza] | [Codice EN 13508-2] | [Posizione] - [Descrizione]
+                                prompt_2 = f"""Sei un Ingegnere Capo. Unisci questi appunti parziali in un RAPPORTO TECNICO.
+                                {bozza_totale}
+                                
+                                REGOLE TASSATIVE DI FORMATTAZIONE:
+                                1. DIVIETO ASSOLUTO DI PREAMBOLI: NON scrivere titoli generali, non inserire date, non inserire formule di conversione (es. ft=m).
+                                2. INIZIA DIRETTAMENTE con le parole "SEZIONE 1: RILEVAZIONE ANOMALIE".
+                                3. FORMATO ELENCO OBBLIGATORIO: Ogni singola riga delle anomalie deve iniziare con il simbolo "• ". Non dimenticarlo mai.
+                                
+                                STRUTTURA OBBLIGATORIA:
+                                SEZIONE 1: RILEVAZIONE ANOMALIE
+                                Tratta ispezionata: dal Pozzetto [Nodo] al Pozzetto [Nodo].
+                                • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione]
 
-                            SEZIONE 2: CLASSIFICAZIONE IQI
-                            (Scrivi qui il paragrafo discorsivo).
+                                SEZIONE 2: CLASSIFICAZIONE IQI
+                                (Paragrafo tecnico discorsivo sull'Indice di Priorità da 1 a 5).
 
-                            SEZIONE 3: VALUTAZIONE STRUTTURALE
-                            (Scrivi qui l'analisi statica e l'elenco numerato delle Azioni Correttive).
-                            """
+                                SEZIONE 3: VALUTAZIONE STRUTTURALE
+                                (Analisi statica e azioni correttive).
+                                """
                                 
                                 testo_generato = model.generate_content(prompt_2).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
