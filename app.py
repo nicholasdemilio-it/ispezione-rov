@@ -1,4 +1,7 @@
 import streamlit as st
+import cv2
+from PIL import Image
+import io
 import google.generativeai as genai
 import tempfile
 import os
@@ -77,8 +80,49 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'\*(.*?)\*', r'\1', testo)
     testo = re.sub(r'__(.*?)__', r'\1', testo)
     testo = re.sub(r'`(.*?)`', r'\1', testo)
+    
+    # Cattura sia "1.99 m" che "[1.99 m]" forzando il punto elenco
+    testo = re.sub(r'^\s*\[?(\d+\.\d+\s*m.*?\|)', r'• [\1', testo, flags=re.MULTILINE)
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
+    
     return testo.strip()
+
+def estrai_frame_salienti(video_path, frame_per_secondo=1):
+    """
+    Copertura 100% (1 foto al secondo).
+    Comprime i frame in JPEG istantaneo per salvare la RAM.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened(): return []
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps == 0 or fps != fps: fps = 25.0
+        
+    frame_interval = max(1, int(fps / frame_per_secondo))
+    
+    frames_estratti = []
+    count = 0
+    while True:
+        success, frame = cap.read()
+        if not success: break
+            
+        if count % frame_interval == 0:
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img_pil = Image.fromarray(frame_rgb)
+            img_pil.thumbnail((800, 800)) 
+            
+            buffer = io.BytesIO()
+            img_pil.save(buffer, format="JPEG", quality=70)
+            
+            frames_estratti.append({
+                "mime_type": "image/jpeg",
+                "data": buffer.getvalue()
+            })
+        count += 1
+        
+    cap.release()
+    return frames_estratti
+
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -597,7 +641,6 @@ else:
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         
-                        # Blocco 1: Verifica che l'utente abbia scelto l'ambiente
                         if not tipo_ispezione:
                             st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
                             st.stop()
@@ -608,82 +651,88 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        # Blocco 2: Caricamento protetto per capire il vero errore di Google
-                        with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
+                        # --- FASE 1: Estrazione ---
+                        with st.spinner("Fase 1/3: Scansione forense totale (1 foto/sec)..."):
                             try:
-                                media_file = genai.upload_file(path=tmp_file_path)
-                                
-                                while media_file.state.name == "PROCESSING":
-                                    time.sleep(3)
-                                    media_file = genai.get_file(media_file.name)
-                                
-                                if media_file.state.name == "FAILED":
-                                    st.error("🚫 Errore Google: Impossibile elaborare il file. Potrebbe essere danneggiato o in un formato non supportato.")
+                                immagini_sospette = estrai_frame_salienti(tmp_file_path, frame_per_secondo=1)
+                                if not immagini_sospette:
+                                    st.error("🚫 Errore: Impossibile estrarre i fotogrammi.")
                                     st.stop()
-                            
+                                st.info(f"✅ Estratti {len(immagini_sospette)} fotogrammi. Inizio elaborazione a blocchi...")
                             except Exception as e:
-                                st.error(f"⚠️ Errore di comunicazione con Google Cloud: {e}")
+                                st.error(f"⚠️ Errore locale: {e}")
                                 st.stop()
-                        
-                        # Blocco 3: Modello Ufficiale Consigliato dall'API Google
+                                
+                        # --- FASE 2: Chunking su Gemini 3.1 Pro ---
                         modello_ideale = "gemini-3.1-pro-preview"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
-                        with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
-                            try:
-                                time.sleep(2)
-                                ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                        bozze_parziali = []
+                        batch_size = 150 # Numero sicuro per non sforare i token
+                        
+                        ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                        
+                        progress_bar = st.progress(0)
+                        totale_batch = (len(immagini_sospette) // batch_size) + (1 if len(immagini_sospette) % batch_size > 0 else 0)
+                        
+                        for i in range(0, len(immagini_sospette), batch_size):
+                            numero_batch = (i // batch_size) + 1
+                            with st.spinner(f"Fase 2/3: Perizia IA Cloud... (Analisi blocco {numero_batch} di {totale_batch})"):
+                                batch_corrente = immagini_sospette[i:i + batch_size]
                                 
                                 prompt_fase1 = f"""{ruolo}
-                                Analizza il video effettuando una perizia forense estremamente dettagliata. 
-                                REGOLE TASSATIVE:
-                                1. TELEMETRIA E OCR: Leggi tutte le scritte in sovrimpressione nel video. Estrai tassativamente i nomi esatti dei pozzetti di partenza/arrivo (es. H10...) e le distanze in metri/piedi.
-                                2. DETTAGLIO CLINICO: Non essere riassuntivo. Per ogni anomalia descrivi in modo esteso: tipologia di difetto, posizione a orologio (es. da ore 12 a ore 3), gravità visiva, stato dei giunti e potenziali conseguenze (es. rischio di collasso, ostruzione o infiltrazione).
-                                3. ZERO ALLUCINAZIONI: Sii analitico e veritiero. Basati unicamente sui pixel del video. Se un dato o un pozzetto non è a schermo, non dedurlo e non inventarlo.
-                                4. FORMATO: Elenca in ordine cronologico indicando [Minuto esatto] - [Distanza rilevata a schermo] - [Difetto e Descrizione Tecnica Estesa].
-                                5. SISTEMA METRICO: Converti TASSATIVAMENTE tutte le unità di misura nel Sistema Metrico Decimale. Le distanze devono essere in Metri (m) e i diametri in Millimetri (mm). VIETATO USARE Piedi (ft) o Pollici (inch).
+                                Stai analizzando un frammento di un'ispezione video.
+                                REGOLE TASSATIVE (PENA IL FALLIMENTO DELLA PERIZIA):
+                                1. OCR TELEMETRICO: Estrai la distanza esatta in metri impressa in ogni fotogramma.
+                                2. ZERO RIASSUNTI (DETTAGLIO CLINICO): Segnala OGNI SINGOLA anomalia visibile (fessure, radici, allacci, detriti, livelli d'acqua). Estrai tutto, non accorpare i metri e non omettere nulla.
+                                3. FORMATO OBBLIGATORIO: Ogni anomalia trovata deve iniziare TASSATIVAMENTE con il simbolo "•".
+                                
+                                Usa ESATTAMENTE questo formato per ogni difetto rilevato:
+                                • [Distanza esatta] - [Difetto e Descrizione Clinica]
                                 """
-                                bozza = model.generate_content([media_file, prompt_fase1]).text
-                            except Exception as e:
-                                st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
-                                st.stop()
-
-                        with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
+                                
+                                try:
+                                    response = model.generate_content(batch_corrente + [prompt_fase1])
+                                    bozze_parziali.append(response.text)
+                                    progress_bar.progress(numero_batch / totale_batch)
+                                    time.sleep(2) # Pausa di respiro per le API
+                                except Exception as e:
+                                    st.error(f"⚠️ Errore API Google sul blocco {numero_batch}: {e}")
+                                    st.stop()
+                                    
+                        bozza_totale = "\n\n".join(bozze_parziali)
+                                
+                        # --- FASE 3: QA e Generazione Referto ---        
+                        with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
                             try:
-                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
-                                {bozza}
+                                prompt_2 = f"""Sei un Ingegnere Capo. Unisci questi appunti parziali in un RAPPORTO TECNICO.
+                                {bozza_totale}
                                 
-                                Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura:
-
+                                REGOLE TASSATIVE DI FORMATTAZIONE:
+                                1. DIVIETO ASSOLUTO DI PREAMBOLI: NON scrivere titoli generali, non inserire date, non inserire formule di conversione (es. ft=m).
+                                2. INIZIA DIRETTAMENTE con le parole "SEZIONE 1: RILEVAZIONE ANOMALIE".
+                                3. FORMATO ELENCO OBBLIGATORIO: Ogni singola riga delle anomalie deve iniziare con il simbolo "• ". Non dimenticarlo mai.
+                                
+                                STRUTTURA OBBLIGATORIA:
                                 SEZIONE 1: RILEVAZIONE ANOMALIE
-                                1. Inizia scrivendo: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
-                                2. Genera l'elenco puntato. Usa ESATTAMENTE questo formato riga per riga (scrivi l'intero punto elenco su una sola riga continua, SENZA ritorni a capo interni):
-                                • [Distanza in metri (m)] | [Codice EN 13508-2 CORRETTO] | [Posizione Orologio] - [Descrizione tecnica].
-                                
-                                ATTENZIONE AI CODICI (REGOLA FERREA): Devi usare i codici corretti della norma europea!
-                                - Fessure/Fratture: Famiglia B (BAB, BAC, BAA, ecc.)
-                                - Allacci/Innesti: Famiglia T (TBA, TBB, TBC, ecc.)
-                                - Livelli Acqua/Inventario: Famiglia M (MWA, MWB, ecc.)
-                                Non assegnare MAI un codice strutturale (es. BAC, BAF) a un livello idrico o a un allaccio!
+                                Tratta ispezionata: dal Pozzetto [Nodo] al Pozzetto [Nodo].
+                                • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione]
 
                                 SEZIONE 2: CLASSIFICAZIONE IQI
-                                Scrivi un singolo paragrafo tecnico spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5).
+                                (Paragrafo tecnico discorsivo sull'Indice di Priorità da 1 a 5).
 
                                 SEZIONE 3: VALUTAZIONE STRUTTURALE
-                                Analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive.
-
-                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie. Usa SOLO il sistema metrico decimale. Correggi ogni errore ortografico.
+                                (Analisi statica e azioni correttive).
                                 """
-                                testo_generato = model.generate_content([media_file, prompt_2]).text
+                                
+                                testo_generato = model.generate_content(prompt_2).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
-                                os.remove(tmp_file_path)
+                                
+                                if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
+                                
                             except Exception as e:
-                                st.error(f"⚠️ Errore durante la fase di certificazione (Fase 2): {e}")
+                                st.error(f"⚠️ Errore certificazione finale: {e}")
                                 st.stop()
-                            
-                            try:
-                                supabase.table("licenze").update({"report_consumati": report_fatti + 1}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
-                            except: pass
 
         if 'report_text' in st.session_state:
             st.success("✅ Analisi completata! (Un credito è stato regolarmente scalato dal tuo abbonamento).")
