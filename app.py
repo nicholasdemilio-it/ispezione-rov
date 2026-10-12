@@ -668,7 +668,7 @@ else:
                                 st.stop()
                         
                         # --- FASE CLOUD: Tiratore Scelto Gemini 1.5 Pro ---
-                        modello_ideale = "gemini-1.5-pro-latest"
+                        modello_ideale = "gemini-1.5-pro-preview"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 2/2: Certificazione IA Cloud sui frame isolati..."):
