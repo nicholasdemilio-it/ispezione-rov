@@ -669,7 +669,8 @@ else:
                         
                         # --- FASE CLOUD: Tiratore Scelto Gemini 1.5 Pro ---
                        # --- FASE CLOUD: Tiratore Scelto Gemini 2.5 Pro ---
-                        modello_ideale = "gemini-2.5-pro"
+                        # --- FASE CLOUD: Tiratore Scelto Gemini 3.1 Pro ---
+                        modello_ideale = "gemini-3.1-pro-preview"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         with st.spinner("Fase 2/3: Perizia IA Cloud sui frame isolati..."):
