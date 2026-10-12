@@ -82,7 +82,8 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'`(.*?)`', r'\1', testo)
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
     return testo.strip()
-    def estrai_frame_salienti(video_path, frame_per_secondo=1):
+
+def estrai_frame_salienti(video_path, frame_per_secondo=1):
     """
     Copertura 100% (1 foto al secondo).
     Comprime i frame in JPEG istantaneo per salvare la RAM.
