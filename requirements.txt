@@ -4,3 +4,5 @@ google-api-python-client
 reportlab
 supabase
 python-dateutil
+opencv-python-headless
+Pillow
