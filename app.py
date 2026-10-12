@@ -75,46 +75,6 @@ def calcola_hash_file(file_path):
     return sha256_hash.hexdigest()
 
 def pulisci_testo_ia(testo_grezzo):
-    def estrai_frame_salienti(video_path, max_frame=15):
-    """
-    Apre il video localmente ed estrae un frame ogni X secondi.
-    Restituisce una lista di oggetti PIL.Image pronti per l'API di Gemini.
-    """
-    cap = cv2.VideoCapture(video_path)
-    
-    # Se il video non si apre, restituisce lista vuota
-    if not cap.isOpened():
-        return []
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps == 0 or fps != fps: # Protezione contro divisioni per zero
-        fps = 25.0
-        
-    frame_totali = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    durata_secondi = frame_totali / fps
-    
-    # Calcola ogni quanti secondi prendere un frame per averne al massimo 'max_frame'
-    intervallo_secondi = max(1, int(durata_secondi / max_frame))
-    frame_interval = int(fps * intervallo_secondi)
-    
-    frames_estratti = []
-    count = 0
-    
-    while len(frames_estratti) < max_frame:
-        success, frame = cap.read()
-        if not success:
-            break
-            
-        if count % frame_interval == 0:
-            # OpenCV legge in BGR, Pillow vuole RGB
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img_pil = Image.fromarray(frame_rgb)
-            frames_estratti.append(img_pil)
-            
-        count += 1
-        
-    cap.release()
-    return frames_estratti
     testo = re.sub(r'#{1,6}\s*', '', testo_grezzo)
     testo = re.sub(r'\*\*(.*?)\*\*', r'\1', testo)
     testo = re.sub(r'\*(.*?)\*', r'\1', testo)
@@ -122,6 +82,41 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'`(.*?)`', r'\1', testo)
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
     return testo.strip()
+
+def estrai_frame_salienti(video_path, frame_per_secondo=1):
+    """
+    Scansiona L'INTERO VIDEO garantendo copertura al 100%.
+    Estrae il numero esatto di frame per secondo indicato.
+    """
+    cap = cv2.VideoCapture(video_path)
+    
+    if not cap.isOpened():
+        return []
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps == 0 or fps != fps: 
+        fps = 25.0
+        
+    frame_interval = max(1, int(fps / frame_per_secondo))
+    
+    frames_estratti = []
+    count = 0
+    
+    while True:
+        success, frame = cap.read()
+        if not success:
+            break
+            
+        if count % frame_interval == 0:
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img_pil = Image.fromarray(frame_rgb)
+            img_pil.thumbnail((1024, 1024))
+            frames_estratti.append(img_pil)
+            
+        count += 1
+        
+    cap.release()
+    return frames_estratti
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -651,42 +646,40 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        # Blocco 2: Caricamento protetto per capire il vero errore di Google
-                        with st.spinner("Caricamento del video in corso (i file pesanti richiedono una buona connessione)..."):
+                        # --- INIZIO MOTORE IBRIDO TOTALE: Copertura 100% ---
+                        with st.spinner("Fase 1/2: Scansione forense dell'intero video (1 foto al secondo)..."):
                             try:
-                                media_file = genai.upload_file(path=tmp_file_path)
-                                
-                                while media_file.state.name == "PROCESSING":
-                                    time.sleep(3)
-                                    media_file = genai.get_file(media_file.name)
-                                
-                                if media_file.state.name == "FAILED":
-                                    st.error("🚫 Errore Google: Impossibile elaborare il file. Potrebbe essere danneggiato o in un formato non supportato.")
+                                immagini_sospette = estrai_frame_salienti(tmp_file_path, frame_per_secondo=1)
+                                if not immagini_sospette:
+                                    st.error("🚫 Errore: Impossibile estrarre i fotogrammi. Il video potrebbe essere corrotto o il codec non supportato.")
                                     st.stop()
-                            
+                                st.info(f"✅ Estratti {len(immagini_sospette)} fotogrammi chiave. Invio al Cloud in corso...")
                             except Exception as e:
-                                st.error(f"⚠️ Errore di comunicazione con Google Cloud: {e}")
+                                st.error(f"⚠️ Errore nell'estrazione video locale: {e}")
                                 st.stop()
                         
-                        # Blocco 3: Modello Ufficiale Consigliato dall'API Google
-                        modello_ideale = "gemini-3.1-pro-preview"
+                        # --- FASE CLOUD: Tiratore Scelto Gemini 1.5 Pro ---
+                        modello_ideale = "gemini-1.5-pro"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
-                        with st.spinner("Fase 1/2: Scansione IA strutturale profonda..."):
+                        with st.spinner("Fase 2/2: Certificazione IA Cloud sui frame isolati..."):
                             try:
-                                time.sleep(2)
                                 ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
                                 
                                 prompt_fase1 = f"""{ruolo}
-                                Analizza il video effettuando una perizia forense estremamente dettagliata. 
+                                Ti sto inviando una sequenza temporale di fotogrammi estratti da un'ispezione fognaria.
+                                Analizza esclusivamente queste immagini ed effettua una perizia forense. 
                                 REGOLE TASSATIVE:
-                                1. TELEMETRIA E OCR: Leggi tutte le scritte in sovrimpressione nel video. Estrai tassativamente i nomi esatti dei pozzetti di partenza/arrivo (es. H10...) e le distanze in metri/piedi.
-                                2. DETTAGLIO CLINICO: Non essere riassuntivo. Per ogni anomalia descrivi in modo esteso: tipologia di difetto, posizione a orologio (es. da ore 12 a ore 3), gravità visiva, stato dei giunti e potenziali conseguenze (es. rischio di collasso, ostruzione o infiltrazione).
-                                3. ZERO ALLUCINAZIONI: Sii analitico e veritiero. Basati unicamente sui pixel del video. Se un dato o un pozzetto non è a schermo, non dedurlo e non inventarlo.
-                                4. FORMATO: Elenca in ordine cronologico indicando [Minuto esatto] - [Distanza rilevata a schermo] - [Difetto e Descrizione Tecnica Estesa].
-                                5. SISTEMA METRICO: Converti TASSATIVAMENTE tutte le unità di misura nel Sistema Metrico Decimale. Le distanze devono essere in Metri (m) e i diametri in Millimetri (mm). VIETATO USARE Piedi (ft) o Pollici (inch).
+                                1. OCR: Estrai le distanze e la telemetria visibile in sovrimpressione in ogni foto.
+                                2. CODICI EN 13508-2: Classifica ogni difetto visibile con il codice normativo corretto (es. BAA per fessure).
+                                3. Restituisci SOLO un rapporto strutturato, senza convenevoli.
                                 """
-                                bozza = model.generate_content([media_file, prompt_fase1]).text
+                                
+                                contenuto_richiesta = immagini_sospette + [prompt_fase1]
+                                
+                                bozza_response = model.generate_content(contenuto_richiesta)
+                                bozza = bozza_response.text
+                                
                             except Exception as e:
                                 st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
                                 st.stop()
