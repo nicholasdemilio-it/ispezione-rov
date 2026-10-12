@@ -668,26 +668,22 @@ else:
                                 st.stop()
                         
                         # --- FASE CLOUD: Tiratore Scelto Gemini 1.5 Pro ---
-                        st.warning("Diagnostica in corso: Lettura dei modelli autorizzati da Google...")
-                        try:
-                            modelli_autorizzati = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                            st.error(f"Modelli disponibili per questa API Key: {modelli_autorizzati}")
-                            st.stop()
-                        except Exception as e:
-                            st.error(f"Errore di lettura modelli: {e}")
-                            st.stop()
+                       # --- FASE CLOUD: Tiratore Scelto Gemini 2.5 Pro ---
+                        modello_ideale = "gemini-2.5-pro"
+                        model = genai.GenerativeModel(model_name=modello_ideale)
                         
-                        with st.spinner("Fase 2/2: Certificazione IA Cloud sui frame isolati..."):
+                        with st.spinner("Fase 2/3: Perizia IA Cloud sui frame isolati..."):
                             try:
                                 ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
                                 
                                 prompt_fase1 = f"""{ruolo}
-                                Ti sto inviando una sequenza temporale di fotogrammi estratti da un'ispezione fognaria.
-                                Analizza esclusivamente queste immagini ed effettua una perizia forense. 
+                                Ti sto inviando una sequenza temporale di fotogrammi estratti da un'ispezione fognaria/strutturale.
+                                Analizza esclusivamente queste immagini ed effettua una perizia forense dettagliata. 
                                 REGOLE TASSATIVE:
-                                1. OCR: Estrai le distanze e la telemetria visibile in sovrimpressione in ogni foto.
-                                2. CODICI EN 13508-2: Classifica ogni difetto visibile con il codice normativo corretto (es. BAA per fessure).
-                                3. Restituisci SOLO un rapporto strutturato, senza convenevoli.
+                                1. TELEMETRIA E OCR: Leggi tutte le scritte in sovrimpressione nel video. Estrai i nomi esatti dei pozzetti e le distanze in metri/piedi.
+                                2. DETTAGLIO CLINICO: Non essere riassuntivo. Per ogni anomalia descrivi: tipologia, posizione a orologio e gravità visiva.
+                                3. ZERO ALLUCINAZIONI: Basati unicamente sui pixel visibili in queste foto. Nessun'altra deduzione.
+                                4. FORMATO: Elenca in ordine indicando [Distanza] - [Difetto e Descrizione].
                                 """
                                 
                                 contenuto_richiesta = immagini_sospette + [prompt_fase1]
@@ -696,40 +692,43 @@ else:
                                 bozza = bozza_response.text
                                 
                             except Exception as e:
-                                st.error(f"⚠️ ERRORE TECNICO GOOGLE: {e}")
+                                st.error(f"⚠️ ERRORE TECNICO GOOGLE (Fase 2): {e}")
                                 st.stop()
-
-                        with st.spinner("Fase 2/2: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
+                                
+                        with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
                             try:
                                 prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
                                 {bozza}
                                 
                                 Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura:
-
+                                
                                 SEZIONE 1: RILEVAZIONE ANOMALIE
                                 1. Inizia scrivendo: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
-                                2. Genera l'elenco puntato. Usa ESATTAMENTE questo formato riga per riga (scrivi l'intero punto elenco su una sola riga continua, SENZA ritorni a capo interni):
+                                2. Genera l'elenco puntato. Usa ESATTAMENTE questo formato riga per riga:
                                 • [Distanza in metri (m)] | [Codice EN 13508-2 CORRETTO] | [Posizione Orologio] - [Descrizione tecnica].
                                 
                                 ATTENZIONE AI CODICI (REGOLA FERREA): Devi usare i codici corretti della norma europea!
                                 - Fessure/Fratture: Famiglia B (BAB, BAC, BAA, ecc.)
                                 - Allacci/Innesti: Famiglia T (TBA, TBB, TBC, ecc.)
                                 - Livelli Acqua/Inventario: Famiglia M (MWA, MWB, ecc.)
-                                Non assegnare MAI un codice strutturale (es. BAC, BAF) a un livello idrico o a un allaccio!
 
                                 SEZIONE 2: CLASSIFICAZIONE IQI
                                 Scrivi un singolo paragrafo tecnico spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5).
 
                                 SEZIONE 3: VALUTAZIONE STRUTTURALE
                                 Analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive.
-
-                                REGOLE TASSATIVE: Nessun paragrafo discorsivo per le anomalie. Usa SOLO il sistema metrico decimale. Correggi ogni errore ortografico.
                                 """
-                                testo_generato = model.generate_content([media_file, prompt_2]).text
+                                
+                                # Qui elabora solo il testo, risparmiando tempo e memoria
+                                testo_generato = model.generate_content(prompt_2).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
-                                os.remove(tmp_file_path)
+                                
+                                # Eliminiamo il video temporaneo per liberare spazio sul server
+                                if os.path.exists(tmp_file_path):
+                                    os.remove(tmp_file_path)
+                                    
                             except Exception as e:
-                                st.error(f"⚠️ Errore durante la fase di certificazione (Fase 2): {e}")
+                                st.error(f"⚠️ Errore durante la fase di certificazione finale: {e}")
                                 st.stop()
                             
                             try:
