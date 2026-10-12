@@ -1,4 +1,7 @@
 import streamlit as st
+import cv2
+from PIL import Image
+import io
 import google.generativeai as genai
 import tempfile
 import os
@@ -72,6 +75,46 @@ def calcola_hash_file(file_path):
     return sha256_hash.hexdigest()
 
 def pulisci_testo_ia(testo_grezzo):
+    def estrai_frame_salienti(video_path, max_frame=15):
+    """
+    Apre il video localmente ed estrae un frame ogni X secondi.
+    Restituisce una lista di oggetti PIL.Image pronti per l'API di Gemini.
+    """
+    cap = cv2.VideoCapture(video_path)
+    
+    # Se il video non si apre, restituisce lista vuota
+    if not cap.isOpened():
+        return []
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps == 0 or fps != fps: # Protezione contro divisioni per zero
+        fps = 25.0
+        
+    frame_totali = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    durata_secondi = frame_totali / fps
+    
+    # Calcola ogni quanti secondi prendere un frame per averne al massimo 'max_frame'
+    intervallo_secondi = max(1, int(durata_secondi / max_frame))
+    frame_interval = int(fps * intervallo_secondi)
+    
+    frames_estratti = []
+    count = 0
+    
+    while len(frames_estratti) < max_frame:
+        success, frame = cap.read()
+        if not success:
+            break
+            
+        if count % frame_interval == 0:
+            # OpenCV legge in BGR, Pillow vuole RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img_pil = Image.fromarray(frame_rgb)
+            frames_estratti.append(img_pil)
+            
+        count += 1
+        
+    cap.release()
+    return frames_estratti
     testo = re.sub(r'#{1,6}\s*', '', testo_grezzo)
     testo = re.sub(r'\*\*(.*?)\*\*', r'\1', testo)
     testo = re.sub(r'\*(.*?)\*', r'\1', testo)
@@ -162,6 +205,21 @@ else:
                         bg_tk = "ticket-row" if t.get('stato') == 'Aperto' else "ticket-row ticket-resolved"
                         stato_icon = "🟠 APERTO" if t.get('stato') == 'Aperto' else "🟢 RISOLTO"
                         
+                        # Formattazione automatica della data e ora con Fuso Orario Italiano
+                        data_raw = t.get('created_at', 'N/D')
+                        if data_raw and data_raw != 'N/D':
+                            try:
+                                # Converte l'orario del server (UTC) in orario italiano
+                                if data_raw.endswith("Z"):
+                                    data_raw = data_raw[:-1] + "+00:00"
+                                dt_utc = datetime.fromisoformat(data_raw)
+                                dt_ita = dt_utc.astimezone(ZoneInfo("Europe/Rome"))
+                                data_formattata = dt_ita.strftime("%d/%m/%Y alle %H:%M")
+                            except Exception as e:
+                                data_formattata = data_raw
+                        else:
+                            data_formattata = "Data sconosciuta"
+                        
                         c_tk_info, c_tk_act = st.columns([4.5, 1])
                         with c_tk_info:
                             st.markdown(f"""
@@ -171,6 +229,7 @@ else:
                                     <span style="font-size: 13px; font-weight: bold;">{stato_icon}</span>
                                 </div>
                                 <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 8px;">
+                                    <span style="color: #38bdf8;">🕒 <b>Ricevuto il:</b> {data_formattata}</span> <br>
                                     <b>Oggetto:</b> {t.get('tipo_problema', 'N/D')} <br>
                                     <b>Contatto:</b> {t.get('preferenza_contatto', 'N/D')} - {t.get('recapito', 'N/D')}
                                 </div>
@@ -760,7 +819,7 @@ else:
                     supabase.table("ticket_assistenza").insert({"codice_licenza": st.session_state['codice_licenza'], "cliente": cliente_nome, "tipo_problema": tipo_problema, "preferenza_contatto": preferenza_contatto, "recapito": recapito_utente, "descrizione": descrizione_problema, "stato": "Aperto"}).execute()
                     st.success("✅ Richiesta inviata con successo! Il nostro team tecnico ha preso in carico la segnalazione. Puoi chiudere questa finestra.")
                 except Exception as e:
-                    st.error(f"⚠️ Errore nell'invio della richiesta.")
+                    st.error("⚠️ Errore di connessione. Impossibile inviare la richiesta, riprova più tardi.")
             else:
                 st.warning("⚠️ Compila tutti i campi (recapito e descrizione) prima di inviare la richiesta.")
 
