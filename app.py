@@ -668,8 +668,14 @@ else:
                                 st.stop()
                         
                         # --- FASE CLOUD: Tiratore Scelto Gemini 1.5 Pro ---
-                        modello_ideale = "gemini-1.5-pro-preview"
-                        model = genai.GenerativeModel(model_name=modello_ideale)
+                        st.warning("Diagnostica in corso: Lettura dei modelli autorizzati da Google...")
+                        try:
+                            modelli_autorizzati = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                            st.error(f"Modelli disponibili per questa API Key: {modelli_autorizzati}")
+                            st.stop()
+                        except Exception as e:
+                            st.error(f"Errore di lettura modelli: {e}")
+                            st.stop()
                         
                         with st.spinner("Fase 2/2: Certificazione IA Cloud sui frame isolati..."):
                             try:
