@@ -85,8 +85,8 @@ def pulisci_testo_ia(testo_grezzo):
 
 def estrai_frame_salienti(video_path, frame_per_secondo=1):
     """
-    Scansiona L'INTERO VIDEO garantendo copertura al 100%.
-    Estrae il numero esatto di frame per secondo indicato.
+    Copertura 100% (1 frame al secondo). 
+    Salva la RAM convertendo istantaneamente i frame in byte JPEG leggeri.
     """
     cap = cv2.VideoCapture(video_path)
     
@@ -110,8 +110,17 @@ def estrai_frame_salienti(video_path, frame_per_secondo=1):
         if count % frame_interval == 0:
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img_pil = Image.fromarray(frame_rgb)
-            img_pil.thumbnail((1024, 1024))
-            frames_estratti.append(img_pil)
+            img_pil.thumbnail((800, 800)) # Risoluzione ideale
+            
+            # --- TRUCCO ANTI-CRASH: Compressione JPEG in RAM ---
+            buffer = io.BytesIO()
+            img_pil.save(buffer, format="JPEG", quality=70)
+            
+            # Gemini accetta direttamente questo formato dizionario
+            frames_estratti.append({
+                "mime_type": "image/jpeg",
+                "data": buffer.getvalue()
+            })
             
         count += 1
         
