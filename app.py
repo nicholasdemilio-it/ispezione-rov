@@ -81,8 +81,8 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'__(.*?)__', r'\1', testo)
     testo = re.sub(r'`(.*?)`', r'\1', testo)
     
-    # FORZATURA: Se una riga inizia con un numero e una "m", aggiunge il pallino in automatico
-    testo = re.sub(r'^\s*(\d+\.\d+\s*m\s*\|)', r'• \1', testo, flags=re.MULTILINE)
+    # Cattura sia "1.99 m" che "[1.99 m]" forzando il punto elenco
+    testo = re.sub(r'^\s*\[?(\d+\.\d+\s*m.*?\|)', r'• [\1', testo, flags=re.MULTILINE)
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
     
     return testo.strip()
