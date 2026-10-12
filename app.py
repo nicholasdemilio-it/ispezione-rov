@@ -82,6 +82,41 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'`(.*?)`', r'\1', testo)
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
     return testo.strip()
+    def estrai_frame_salienti(video_path, frame_per_secondo=1):
+    """
+    Copertura 100% (1 foto al secondo).
+    Comprime i frame in JPEG istantaneo per salvare la RAM.
+    """
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened(): return []
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps == 0 or fps != fps: fps = 25.0
+        
+    frame_interval = max(1, int(fps / frame_per_secondo))
+    
+    frames_estratti = []
+    count = 0
+    while True:
+        success, frame = cap.read()
+        if not success: break
+            
+        if count % frame_interval == 0:
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            img_pil = Image.fromarray(frame_rgb)
+            img_pil.thumbnail((800, 800)) 
+            
+            buffer = io.BytesIO()
+            img_pil.save(buffer, format="JPEG", quality=70)
+            
+            frames_estratti.append({
+                "mime_type": "image/jpeg",
+                "data": buffer.getvalue()
+            })
+        count += 1
+        
+    cap.release()
+    return frames_estratti
 
 
 if not st.session_state['logged_in']:
