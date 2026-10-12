@@ -83,10 +83,10 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
     return testo.strip()
 
-def estrai_frame_salienti(video_path, frame_per_secondo=1):
+def estrai_frame_salienti(video_path, max_frame_totali=300):
     """
-    Copertura 100% (1 frame al secondo). 
-    Salva la RAM convertendo istantaneamente i frame in byte JPEG leggeri.
+    Copertura Intelligente: estrae max 300 frame distribuiti su tutto il video.
+    Salva la RAM e non supera il limite di 1 Milione di Token di Gemini.
     """
     cap = cv2.VideoCapture(video_path)
     
@@ -97,7 +97,12 @@ def estrai_frame_salienti(video_path, frame_per_secondo=1):
     if fps == 0 or fps != fps: 
         fps = 25.0
         
-    frame_interval = max(1, int(fps / frame_per_secondo))
+    frame_totali = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    durata_secondi = frame_totali / fps
+    
+    # Calcola l'intervallo per avere al massimo 300 foto (es. 1 ogni 3-4 secondi per video lunghi)
+    intervallo_secondi = max(1, int(durata_secondi / max_frame_totali))
+    frame_interval = int(fps * intervallo_secondi)
     
     frames_estratti = []
     count = 0
@@ -107,16 +112,16 @@ def estrai_frame_salienti(video_path, frame_per_secondo=1):
         if not success:
             break
             
-        if count % frame_interval == 0:
+        # Prende il frame solo all'intervallo giusto e si ferma a 300
+        if count % frame_interval == 0 and len(frames_estratti) < max_frame_totali:
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             img_pil = Image.fromarray(frame_rgb)
-            img_pil.thumbnail((800, 800)) # Risoluzione ideale
+            img_pil.thumbnail((800, 800)) 
             
-            # --- TRUCCO ANTI-CRASH: Compressione JPEG in RAM ---
+            # Compressione byte per salvare la RAM di Streamlit
             buffer = io.BytesIO()
             img_pil.save(buffer, format="JPEG", quality=70)
             
-            # Gemini accetta direttamente questo formato dizionario
             frames_estratti.append({
                 "mime_type": "image/jpeg",
                 "data": buffer.getvalue()
@@ -658,7 +663,7 @@ else:
                         # --- INIZIO MOTORE IBRIDO TOTALE: Copertura 100% ---
                         with st.spinner("Fase 1/2: Scansione forense dell'intero video (1 foto al secondo)..."):
                             try:
-                                immagini_sospette = estrai_frame_salienti(tmp_file_path, frame_per_secondo=1)
+                                immagini_sospette = estrai_frame_salienti(tmp_file_path, max_frame_totali=300)
                                 if not immagini_sospette:
                                     st.error("🚫 Errore: Impossibile estrarre i fotogrammi. Il video potrebbe essere corrotto o il codec non supportato.")
                                     st.stop()
