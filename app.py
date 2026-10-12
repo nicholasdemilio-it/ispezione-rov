@@ -677,11 +677,14 @@ else:
                                 batch_corrente = immagini_sospette[i:i + batch_size]
                                 
                                 prompt_fase1 = f"""{ruolo}
-                                Stai analizzando un frammento di un'ispezione video più lunga.
-                                REGOLE TASSATIVE:
-                                1. OCR: Estrai le distanze e i metri.
-                                2. DETTAGLIO CLINICO: Segnala ogni singola anomalia (fessure, radici, allacci, detriti, livelli d'acqua anomali).
-                                3. FORMATO: [Distanza] - [Difetto e Descrizione].
+                                Stai analizzando un frammento di un'ispezione video.
+                                REGOLE TASSATIVE (PENA IL FALLIMENTO DELLA PERIZIA):
+                                1. OCR TELEMETRICO: Estrai la distanza esatta in metri impressa in ogni fotogramma.
+                                2. ZERO RIASSUNTI (DETTAGLIO CLINICO): Segnala OGNI SINGOLA anomalia visibile (fessure, radici, allacci, detriti, livelli d'acqua). Estrai tutto, non accorpare i metri e non omettere nulla.
+                                3. FORMATO OBBLIGATORIO: Ogni anomalia trovata deve iniziare TASSATIVAMENTE con il simbolo "•".
+                                
+                                Usa ESATTAMENTE questo formato per ogni difetto rilevato:
+                                • [Distanza esatta] - [Difetto e Descrizione Clinica]
                                 """
                                 
                                 try:
@@ -698,23 +701,24 @@ else:
                         # --- FASE 3: QA e Generazione Referto ---        
                         with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
                             try:
-                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Unisci ed elabora questi appunti parziali:
-                                {bozza_totale}
-                                
-                                Riscrivi un UNICO RAPPORTO TECNICO CERTIFICATO COMPLETO.
-                                
-                                SEZIONE 1: RILEVAZIONE ANOMALIE
-                                - Scrivi: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
-                                - Elenca cronologicamente TUTTE le anomalie trovate in questo formato:
-                                • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione].
-                                ATTENZIONE: Inserisci ogni singola anomalia rilevata negli appunti. Non riassumere e non saltare metri. Usa codici corretti (es. BAA, TBA, MWA).
+                                prompt_2 = f"""Sei un Ingegnere Capo specializzato. Unisci questi appunti in un RAPPORTO TECNICO CERTIFICATO.
+                            
+                            REGOLE TASSATIVE:
+                            1. COPIA TUTTO: Inserisci TUTTE le anomalie degli appunti. Vietato riassumere, omettere o accorpare.
+                            2. NESSUN SEGNAPOSTO: Non usare MAI diciture fittizie come [Data Odierna] o stringhe matematiche di conversione.
+                            3. FORMATO ELENCO RIGIDO: OGNI riga delle anomalie DEVE INIZIARE TASSATIVAMENTE con il simbolo "• " (Punto elenco e spazio).
+                            
+                            SEZIONE 1: RILEVAZIONE ANOMALIE
+                            Tratta ispezionata: dal Pozzetto [Nodo] al Pozzetto [Nodo].
+                            (Elenca le anomalie incolonnate usando ESATTAMENTE questo formato):
+                            • [Distanza] | [Codice EN 13508-2] | [Posizione] - [Descrizione]
 
-                                SEZIONE 2: CLASSIFICAZIONE IQI
-                                Paragrafo tecnico sull'Indice di Priorità (da 1 a 5) in base alla gravità generale.
+                            SEZIONE 2: CLASSIFICAZIONE IQI
+                            (Scrivi qui il paragrafo discorsivo).
 
-                                SEZIONE 3: VALUTAZIONE STRUTTURALE
-                                Analisi statica e azioni correttive (fresatura, liner, ecc).
-                                """
+                            SEZIONE 3: VALUTAZIONE STRUTTURALE
+                            (Scrivi qui l'analisi statica e l'elenco numerato delle Azioni Correttive).
+                            """
                                 
                                 testo_generato = model.generate_content(prompt_2).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
