@@ -83,83 +83,6 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
     return testo.strip()
 
-# --- FASE 1: Estrazione ---
-                        with st.spinner("Fase 1/3: Scansione forense totale (1 foto/sec)..."):
-                            try:
-                                immagini_sospette = estrai_frame_salienti(tmp_file_path, frame_per_secondo=1)
-                                if not immagini_sospette:
-                                    st.error("🚫 Errore: Impossibile estrarre i fotogrammi.")
-                                    st.stop()
-                                st.info(f"✅ Estratti {len(immagini_sospette)} fotogrammi. Inizio elaborazione a blocchi...")
-                            except Exception as e:
-                                st.error(f"⚠️ Errore locale: {e}")
-                                st.stop()
-                                
-                        # --- FASE 2: Chunking su Gemini 3.1 Pro ---
-                        modello_ideale = "gemini-3.1-pro-preview"
-                        model = genai.GenerativeModel(model_name=modello_ideale)
-                        
-                        bozze_parziali = []
-                        batch_size = 150 # Numero sicuro per non sforare i token
-                        
-                        ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
-                        
-                        progress_bar = st.progress(0)
-                        totale_batch = (len(immagini_sospette) // batch_size) + (1 if len(immagini_sospette) % batch_size > 0 else 0)
-                        
-                        for i in range(0, len(immagini_sospette), batch_size):
-                            numero_batch = (i // batch_size) + 1
-                            with st.spinner(f"Fase 2/3: Perizia IA Cloud... (Analisi blocco {numero_batch} di {totale_batch})"):
-                                batch_corrente = immagini_sospette[i:i + batch_size]
-                                
-                                prompt_fase1 = f"""{ruolo}
-                                Stai analizzando un frammento di un'ispezione video più lunga.
-                                REGOLE TASSATIVE:
-                                1. OCR: Estrai le distanze e i metri.
-                                2. DETTAGLIO CLINICO: Segnala ogni singola anomalia (fessure, radici, allacci, detriti, livelli d'acqua anomali).
-                                3. FORMATO: [Distanza] - [Difetto e Descrizione].
-                                """
-                                
-                                try:
-                                    response = model.generate_content(batch_corrente + [prompt_fase1])
-                                    bozze_parziali.append(response.text)
-                                    progress_bar.progress(numero_batch / totale_batch)
-                                    time.sleep(2) # Pausa di respiro per le API di Google
-                                except Exception as e:
-                                    st.error(f"⚠️ Errore API Google sul blocco {numero_batch}: {e}")
-                                    st.stop()
-                                    
-                        bozza_totale = "\n\n".join(bozze_parziali)
-                                
-                        # --- FASE 3: QA e Generazione Referto ---        
-                        with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
-                            try:
-                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Unisci ed elabora questi appunti parziali:
-                                {bozza_totale}
-                                
-                                Riscrivi un UNICO RAPPORTO TECNICO CERTIFICATO COMPLETO.
-                                
-                                SEZIONE 1: RILEVAZIONE ANOMALIE
-                                - Scrivi: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
-                                - Elenca cronologicamente TUTTE le anomalie trovate in questo formato:
-                                • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione].
-                                ATTENZIONE: Inserisci ogni singola anomalia rilevata negli appunti. Non riassumere e non saltare metri. Usa codici corretti (es. BAA, TBA, MWA).
-
-                                SEZIONE 2: CLASSIFICAZIONE IQI
-                                Paragrafo tecnico sull'Indice di Priorità (da 1 a 5) in base alla gravità generale.
-
-                                SEZIONE 3: VALUTAZIONE STRUTTURALE
-                                Analisi statica e azioni correttive (fresatura, liner, ecc).
-                                """
-                                
-                                testo_generato = model.generate_content(prompt_2).text
-                                st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
-                                
-                                if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
-                                
-                            except Exception as e:
-                                st.error(f"⚠️ Errore certificazione finale: {e}")
-                                st.stop()
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
@@ -678,7 +601,6 @@ else:
                     
                     if st.button("Avvia Analisi Enterprise", use_container_width=True):
                         
-                        # Blocco 1: Verifica che l'utente abbia scelto l'ambiente
                         if not tipo_ispezione:
                             st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
                             st.stop()
@@ -689,86 +611,83 @@ else:
                         
                         st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
                         
-                        # --- INIZIO MOTORE IBRIDO TOTALE: Copertura 100% ---
-                        with st.spinner("Fase 1/2: Scansione forense dell'intero video (1 foto al secondo)..."):
+                        # --- FASE 1: Estrazione ---
+                        with st.spinner("Fase 1/3: Scansione forense totale (1 foto/sec)..."):
                             try:
-                                immagini_sospette = estrai_frame_salienti(tmp_file_path, max_frame_totali=300)
+                                immagini_sospette = estrai_frame_salienti(tmp_file_path, frame_per_secondo=1)
                                 if not immagini_sospette:
-                                    st.error("🚫 Errore: Impossibile estrarre i fotogrammi. Il video potrebbe essere corrotto o il codec non supportato.")
+                                    st.error("🚫 Errore: Impossibile estrarre i fotogrammi.")
                                     st.stop()
-                                st.info(f"✅ Estratti {len(immagini_sospette)} fotogrammi chiave. Invio al Cloud in corso...")
+                                st.info(f"✅ Estratti {len(immagini_sospette)} fotogrammi. Inizio elaborazione a blocchi...")
                             except Exception as e:
-                                st.error(f"⚠️ Errore nell'estrazione video locale: {e}")
+                                st.error(f"⚠️ Errore locale: {e}")
                                 st.stop()
-                        
-                        # --- FASE CLOUD: Tiratore Scelto Gemini 1.5 Pro ---
-                       # --- FASE CLOUD: Tiratore Scelto Gemini 2.5 Pro ---
-                        # --- FASE CLOUD: Tiratore Scelto Gemini 3.1 Pro ---
+                                
+                        # --- FASE 2: Chunking su Gemini 3.1 Pro ---
                         modello_ideale = "gemini-3.1-pro-preview"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
-                        with st.spinner("Fase 2/3: Perizia IA Cloud sui frame isolati..."):
-                            try:
-                                ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                        bozze_parziali = []
+                        batch_size = 150 # Numero sicuro per non sforare i token
+                        
+                        ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                        
+                        progress_bar = st.progress(0)
+                        totale_batch = (len(immagini_sospette) // batch_size) + (1 if len(immagini_sospette) % batch_size > 0 else 0)
+                        
+                        for i in range(0, len(immagini_sospette), batch_size):
+                            numero_batch = (i // batch_size) + 1
+                            with st.spinner(f"Fase 2/3: Perizia IA Cloud... (Analisi blocco {numero_batch} di {totale_batch})"):
+                                batch_corrente = immagini_sospette[i:i + batch_size]
                                 
                                 prompt_fase1 = f"""{ruolo}
-                                Ti sto inviando una sequenza temporale di fotogrammi estratti da un'ispezione fognaria/strutturale.
-                                Analizza esclusivamente queste immagini ed effettua una perizia forense dettagliata. 
+                                Stai analizzando un frammento di un'ispezione video più lunga.
                                 REGOLE TASSATIVE:
-                                1. TELEMETRIA E OCR: Leggi tutte le scritte in sovrimpressione nel video. Estrai i nomi esatti dei pozzetti e le distanze in metri/piedi.
-                                2. DETTAGLIO CLINICO: Non essere riassuntivo. Per ogni anomalia descrivi: tipologia, posizione a orologio e gravità visiva.
-                                3. ZERO ALLUCINAZIONI: Basati unicamente sui pixel visibili in queste foto. Nessun'altra deduzione.
-                                4. FORMATO: Elenca in ordine indicando [Distanza] - [Difetto e Descrizione].
+                                1. OCR: Estrai le distanze e i metri.
+                                2. DETTAGLIO CLINICO: Segnala ogni singola anomalia (fessure, radici, allacci, detriti, livelli d'acqua anomali).
+                                3. FORMATO: [Distanza] - [Difetto e Descrizione].
                                 """
                                 
-                                contenuto_richiesta = immagini_sospette + [prompt_fase1]
+                                try:
+                                    response = model.generate_content(batch_corrente + [prompt_fase1])
+                                    bozze_parziali.append(response.text)
+                                    progress_bar.progress(numero_batch / totale_batch)
+                                    time.sleep(2) # Pausa di respiro per le API
+                                except Exception as e:
+                                    st.error(f"⚠️ Errore API Google sul blocco {numero_batch}: {e}")
+                                    st.stop()
+                                    
+                        bozza_totale = "\n\n".join(bozze_parziali)
                                 
-                                bozza_response = model.generate_content(contenuto_richiesta)
-                                bozza = bozza_response.text
-                                
-                            except Exception as e:
-                                st.error(f"⚠️ ERRORE TECNICO GOOGLE (Fase 2): {e}")
-                                st.stop()
-                                
+                        # --- FASE 3: QA e Generazione Referto ---        
                         with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
                             try:
-                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Prendi la bozza sottostante:
-                                {bozza}
+                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Unisci ed elabora questi appunti parziali:
+                                {bozza_totale}
                                 
-                                Riscrivi il RAPPORTO TECNICO CERTIFICATO seguendo TASSATIVAMENTE questa struttura:
+                                Riscrivi un UNICO RAPPORTO TECNICO CERTIFICATO COMPLETO.
                                 
                                 SEZIONE 1: RILEVAZIONE ANOMALIE
-                                1. Inizia scrivendo: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
-                                2. Genera l'elenco puntato. Usa ESATTAMENTE questo formato riga per riga:
-                                • [Distanza in metri (m)] | [Codice EN 13508-2 CORRETTO] | [Posizione Orologio] - [Descrizione tecnica].
-                                
-                                ATTENZIONE AI CODICI (REGOLA FERREA): Devi usare i codici corretti della norma europea!
-                                - Fessure/Fratture: Famiglia B (BAB, BAC, BAA, ecc.)
-                                - Allacci/Innesti: Famiglia T (TBA, TBB, TBC, ecc.)
-                                - Livelli Acqua/Inventario: Famiglia M (MWA, MWB, ecc.)
+                                - Scrivi: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
+                                - Elenca cronologicamente TUTTE le anomalie trovate in questo formato:
+                                • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione].
+                                ATTENZIONE: Inserisci ogni singola anomalia rilevata negli appunti. Non riassumere e non saltare metri. Usa codici corretti (es. BAA, TBA, MWA).
 
                                 SEZIONE 2: CLASSIFICAZIONE IQI
-                                Scrivi un singolo paragrafo tecnico spiegando il calcolo dell'Indice di Priorità d'Intervento (da 1 a 5).
+                                Paragrafo tecnico sull'Indice di Priorità (da 1 a 5) in base alla gravità generale.
 
                                 SEZIONE 3: VALUTAZIONE STRUTTURALE
-                                Analisi ingegneristica concisa sulla statica del tubo, seguita da un elenco puntato delle azioni correttive.
+                                Analisi statica e azioni correttive (fresatura, liner, ecc).
                                 """
                                 
-                                # Qui elabora solo il testo, risparmiando tempo e memoria
                                 testo_generato = model.generate_content(prompt_2).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
                                 
-                                # Eliminiamo il video temporaneo per liberare spazio sul server
-                                if os.path.exists(tmp_file_path):
-                                    os.remove(tmp_file_path)
-                                    
+                                if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
+                                
                             except Exception as e:
-                                st.error(f"⚠️ Errore durante la fase di certificazione finale: {e}")
+                                st.error(f"⚠️ Errore certificazione finale: {e}")
                                 st.stop()
-                            
-                            try:
-                                supabase.table("licenze").update({"report_consumati": report_fatti + 1}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
-                            except: pass
 
         if 'report_text' in st.session_state:
             st.success("✅ Analisi completata! (Un credito è stato regolarmente scalato dal tuo abbonamento).")
