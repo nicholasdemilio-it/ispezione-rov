@@ -83,54 +83,83 @@ def pulisci_testo_ia(testo_grezzo):
     testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
     return testo.strip()
 
-def estrai_frame_salienti(video_path, max_frame_totali=300):
-    """
-    Copertura Intelligente: estrae max 300 frame distribuiti su tutto il video.
-    Salva la RAM e non supera il limite di 1 Milione di Token di Gemini.
-    """
-    cap = cv2.VideoCapture(video_path)
-    
-    if not cap.isOpened():
-        return []
+# --- FASE 1: Estrazione ---
+                        with st.spinner("Fase 1/3: Scansione forense totale (1 foto/sec)..."):
+                            try:
+                                immagini_sospette = estrai_frame_salienti(tmp_file_path, frame_per_secondo=1)
+                                if not immagini_sospette:
+                                    st.error("🚫 Errore: Impossibile estrarre i fotogrammi.")
+                                    st.stop()
+                                st.info(f"✅ Estratti {len(immagini_sospette)} fotogrammi. Inizio elaborazione a blocchi...")
+                            except Exception as e:
+                                st.error(f"⚠️ Errore locale: {e}")
+                                st.stop()
+                                
+                        # --- FASE 2: Chunking su Gemini 3.1 Pro ---
+                        modello_ideale = "gemini-3.1-pro-preview"
+                        model = genai.GenerativeModel(model_name=modello_ideale)
+                        
+                        bozze_parziali = []
+                        batch_size = 150 # Numero sicuro per non sforare i token
+                        
+                        ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                        
+                        progress_bar = st.progress(0)
+                        totale_batch = (len(immagini_sospette) // batch_size) + (1 if len(immagini_sospette) % batch_size > 0 else 0)
+                        
+                        for i in range(0, len(immagini_sospette), batch_size):
+                            numero_batch = (i // batch_size) + 1
+                            with st.spinner(f"Fase 2/3: Perizia IA Cloud... (Analisi blocco {numero_batch} di {totale_batch})"):
+                                batch_corrente = immagini_sospette[i:i + batch_size]
+                                
+                                prompt_fase1 = f"""{ruolo}
+                                Stai analizzando un frammento di un'ispezione video più lunga.
+                                REGOLE TASSATIVE:
+                                1. OCR: Estrai le distanze e i metri.
+                                2. DETTAGLIO CLINICO: Segnala ogni singola anomalia (fessure, radici, allacci, detriti, livelli d'acqua anomali).
+                                3. FORMATO: [Distanza] - [Difetto e Descrizione].
+                                """
+                                
+                                try:
+                                    response = model.generate_content(batch_corrente + [prompt_fase1])
+                                    bozze_parziali.append(response.text)
+                                    progress_bar.progress(numero_batch / totale_batch)
+                                    time.sleep(2) # Pausa di respiro per le API di Google
+                                except Exception as e:
+                                    st.error(f"⚠️ Errore API Google sul blocco {numero_batch}: {e}")
+                                    st.stop()
+                                    
+                        bozza_totale = "\n\n".join(bozze_parziali)
+                                
+                        # --- FASE 3: QA e Generazione Referto ---        
+                        with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
+                            try:
+                                prompt_2 = f"""Sei un Ingegnere Capo specializzato in certificazioni. Unisci ed elabora questi appunti parziali:
+                                {bozza_totale}
+                                
+                                Riscrivi un UNICO RAPPORTO TECNICO CERTIFICATO COMPLETO.
+                                
+                                SEZIONE 1: RILEVAZIONE ANOMALIE
+                                - Scrivi: "Tratta ispezionata: dal Pozzetto [Nome] al Pozzetto [Nome]".
+                                - Elenca cronologicamente TUTTE le anomalie trovate in questo formato:
+                                • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione].
+                                ATTENZIONE: Inserisci ogni singola anomalia rilevata negli appunti. Non riassumere e non saltare metri. Usa codici corretti (es. BAA, TBA, MWA).
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps == 0 or fps != fps: 
-        fps = 25.0
-        
-    frame_totali = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    durata_secondi = frame_totali / fps
-    
-    # Calcola l'intervallo per avere al massimo 300 foto (es. 1 ogni 3-4 secondi per video lunghi)
-    intervallo_secondi = max(1, int(durata_secondi / max_frame_totali))
-    frame_interval = int(fps * intervallo_secondi)
-    
-    frames_estratti = []
-    count = 0
-    
-    while True:
-        success, frame = cap.read()
-        if not success:
-            break
-            
-        # Prende il frame solo all'intervallo giusto e si ferma a 300
-        if count % frame_interval == 0 and len(frames_estratti) < max_frame_totali:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img_pil = Image.fromarray(frame_rgb)
-            img_pil.thumbnail((800, 800)) 
-            
-            # Compressione byte per salvare la RAM di Streamlit
-            buffer = io.BytesIO()
-            img_pil.save(buffer, format="JPEG", quality=70)
-            
-            frames_estratti.append({
-                "mime_type": "image/jpeg",
-                "data": buffer.getvalue()
-            })
-            
-        count += 1
-        
-    cap.release()
-    return frames_estratti
+                                SEZIONE 2: CLASSIFICAZIONE IQI
+                                Paragrafo tecnico sull'Indice di Priorità (da 1 a 5) in base alla gravità generale.
+
+                                SEZIONE 3: VALUTAZIONE STRUTTURALE
+                                Analisi statica e azioni correttive (fresatura, liner, ecc).
+                                """
+                                
+                                testo_generato = model.generate_content(prompt_2).text
+                                st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
+                                
+                                if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
+                                
+                            except Exception as e:
+                                st.error(f"⚠️ Errore certificazione finale: {e}")
+                                st.stop()
 
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
