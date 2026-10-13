@@ -567,17 +567,27 @@ else:
                                     st.session_state['delete_target'] = riga['codice_licenza']
                                     st.rerun()
                             with c_info:
+                                # Calcolo Costi e Margini (Visibile solo a te)
+                                report_fatti = riga.get('report_consumati', 0)
+                                costo_stimato_api = report_fatti * 0.15 # Costo medio di 15 centesimi a report con modello Flash
+                                prezzo_cliente = riga.get('prezzo', 0)
+                                margine_netto = prezzo_cliente - costo_stimato_api
+
                                 st.markdown(f"""
                                 <div class="{bg_class}">
                                     <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                                         <span style="font-weight: bold; font-size: 16px;">{riga['cliente']}</span>
-                                        <span style="font-size: 14px; color: #38bdf8;">€ {riga.get('prezzo','N/D')} ({riga.get('frequenza','N/D')})</span>
+                                        <span style="font-size: 14px; color: #38bdf8;">€ {prezzo_cliente} ({riga.get('frequenza','N/D')})</span>
                                         <span style="font-family: monospace; color: #94a3b8;">{riga['codice_licenza']}</span>
                                     </div>
                                     <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1;">
                                         <span><b>User/Pass:</b> {riga.get('username','N/D')} / {riga.get('password','N/D')}</span>
-                                        <span><b>Report:</b> {riga.get('report_consumati',0)}/{riga.get('limite_report',50)}</span>
+                                        <span><b>Report:</b> {report_fatti}/{riga.get('limite_report',50)}</span>
                                         <span style="color: {'#10b981' if riga['attiva'] else '#ef4444'};"><b>Prox Rinnovo:</b> {riga.get('prossimo_rinnovo','N/D')}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #334155;">
+                                        <span style="color: #f43f5e;"><b>📉 Spesa API Google:</b> ~ {costo_stimato_api:.2f} €</span>
+                                        <span style="color: #10b981;"><b>💰 Margine Netto:</b> ~ {margine_netto:.2f} €</span>
                                     </div>
                                 </div>
                                 """, unsafe_allow_html=True)
