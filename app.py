@@ -673,15 +673,8 @@ else:
                                 st.error(f"⚠️ Errore locale: {e}")
                                 st.stop()
                                 
-                        # --- FASE 2: Chunking su Gemini 3.1 Pro ---
-                        
-                        # --- INIZIO RICERCA MODELLI ---
-                        modelli_validi = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                        st.error(f"🚨 MODELLI SUPPORTATI: {', '.join(modelli_validi)}")
-                        st.stop()
-                        # --- FINE RICERCA MODELLI ---
-                        
-                        modello_ideale = "gemini-1.5-flash-latest"
+                        # --- FASE 2: Chunking su Gemini Flash ---
+                        modello_ideale = "gemini-3.8-flash"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         bozze_parziali = []
