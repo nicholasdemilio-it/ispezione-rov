@@ -674,7 +674,7 @@ else:
                                 st.stop()
                                 
                         # --- FASE 2: Chunking su Gemini 3.1 Pro ---
-                        modello_ideale = "gemini-1.5-flash"
+                        modello_ideale = "gemini-1.5-flash-latest"
                         model = genai.GenerativeModel(model_name=modello_ideale)
                         
                         bozze_parziali = []
