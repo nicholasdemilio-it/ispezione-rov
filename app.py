@@ -739,6 +739,9 @@ else:
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
                                 
                                 if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
+                                    # Scala il credito effettivo su Supabase
+                                nuovo_consumo = report_fatti + 1
+                                supabase.table("licenze").update({"report_consumati": nuovo_consumo}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
                                 
                             except Exception as e:
                                 st.error(f"⚠️ Errore certificazione finale: {e}")
