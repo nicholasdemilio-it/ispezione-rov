@@ -168,7 +168,7 @@ if not st.session_state['logged_in']:
             st.session_state['do_login'] = False
             
             # ACCESSO ADMIN
-            if username == "Hydroadmin45" and password == "Hydremilio.368":
+            if username == st.secrets["ADMIN_USER"] and password == st.secrets["ADMIN_PASS"]:
                 st.session_state['logged_in'] = True
                 st.session_state['is_admin'] = True
                 st.rerun()
