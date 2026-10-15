@@ -712,7 +712,7 @@ else:
                                 
                         # --- CONFIGURAZIONE MODELLI E DIZIONARI NORMATIVI ---
                         modello_visione = "gemini-3.8-flash" # Veloce per l'estrazione frame-by-frame
-                        modello_perito = "gemini-2.5-pro"    # Massima precisione per calcolo strutturale e QA
+                        modello_perito = "gemini-3.1-pro-preview"    # Massima precisione per calcolo strutturale e QA
                         
                         model_flash = genai.GenerativeModel(model_name=modello_visione)
                         model_pro = genai.GenerativeModel(model_name=modello_perito)
