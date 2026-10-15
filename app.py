@@ -1,3 +1,5 @@
+Codice funzionante prima delle modifiche del 15 ottobre 2026
+
 import streamlit as st
 import cv2
 from PIL import Image
@@ -710,726 +712,170 @@ else:
                                 st.error(f"⚠️ Errore locale: {e}")
                                 st.stop()
                                 
-                        import streamlit as st
-import cv2
-from PIL import Image
-import io
-import google.generativeai as genai
-import tempfile
-import os
-import time
-import random
-import string
-import hashlib
-import re
-from datetime import datetime
-from zoneinfo import ZoneInfo
-from dateutil.relativedelta import relativedelta
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib import colors
-from supabase import create_client, Client
-
-st.set_page_config(page_title="HydroAegis AI - Ispettore IA", page_icon="🔍", layout="wide")
-
-
-# --- SCUDO CSS PER NASCONDERE STREAMLIT E ABBELLIRE LA UI ---
-st.markdown("""
-    <style>
-    /* Nasconde il menu e il footer di Streamlit */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    .stApp { background: radial-gradient(circle at top left, #0b1a30 0%, #050b14 100%); color: #f1f5f9; }
-    div.stButton > button { background: linear-gradient(135deg, #1e3a8a 0%, #0ea5e9 100%); color: white; border: none; border-radius: 8px; font-weight: 600; transition: all 0.3s ease; }
-    div.stButton > button:hover { box-shadow: 0 0 15px rgba(14, 165, 233, 0.6); transform: translateY(-2px); color: white; border: none; }
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea, .stSelectbox>div>div>div { background-color: rgba(15, 23, 42, 0.6); color: #e2e8f0; border: 1px solid #1e3a8a; border-radius: 8px; }
-    .stAlert { background-color: rgba(30, 58, 138, 0.2); border: 1px solid #1e3a8a; color: #e2e8f0; }
-    .info-card { background: rgba(15, 23, 42, 0.6); border: 1px solid #1e3a8a; padding: 20px; border-radius: 12px; margin-top: 20px; }
-    .privacy-box { background: rgba(15, 23, 42, 0.7); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; margin-top: 25px; margin-bottom: 20px; font-size: 14px; color: #cbd5e1; }
-    .support-box { background: rgba(15, 23, 42, 0.8); border: 1px solid #38bdf8; padding: 20px; border-radius: 12px; margin-top: 30px; margin-bottom: 20px; }
-    .roi-box { background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; margin-top: 15px; }
-    .client-row { background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #10b981; margin-bottom: 10px; }
-    .client-suspended { border-left: 4px solid #ef4444; opacity: 0.8; }
-    .ticket-row { background-color: rgba(15, 23, 42, 0.6); padding: 15px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 10px; }
-    .ticket-resolved { border-left: 4px solid #10b981; opacity: 0.7; }
-    .price-table { width: 100%; border-collapse: collapse; margin-top: 10px; color: #e2e8f0; font-size: 14px;}
-    .price-table th { background-color: #1e3a8a; padding: 10px; border: 1px solid #0f172a; }
-    .price-table td { background-color: rgba(15, 23, 42, 0.6); padding: 10px; border: 1px solid #0f172a; text-align: center; }
-    </style>
-""", unsafe_allow_html=True)
-
-@st.cache_resource
-def init_supabase():
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
-
-supabase: Client = init_supabase()
-
-if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
-if 'is_admin' not in st.session_state: st.session_state['is_admin'] = False
-if 'do_login' not in st.session_state: st.session_state['do_login'] = False
-if 'delete_target' not in st.session_state: st.session_state['delete_target'] = None
-
-def trigger_login(): st.session_state['do_login'] = True
-
-def genera_codice():
-    p1 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    p2 = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-    return f"LIC-{p1}-{p2}"
-
-def calcola_hash_file(file_path):
-    sha256_hash = hashlib.sha256()
-    with open(file_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    return sha256_hash.hexdigest()
-
-def pulisci_testo_ia(testo_grezzo):
-    testo = re.sub(r'#{1,6}\s*', '', testo_grezzo)
-    testo = re.sub(r'\*\*(.*?)\*\*', r'\1', testo)
-    testo = re.sub(r'\*(.*?)\*', r'\1', testo)
-    testo = re.sub(r'__(.*?)__', r'\1', testo)
-    testo = re.sub(r'`(.*?)`', r'\1', testo)
-    
-    # Cattura sia "1.99 m" che "[1.99 m]" forzando il punto elenco
-    testo = re.sub(r'^\s*\[?(\d+\.\d+\s*m.*?\|)', r'• [\1', testo, flags=re.MULTILINE)
-    testo = re.sub(r'^\s*[-*•]\s+', '• ', testo, flags=re.MULTILINE)
-    
-    return testo.strip()
-
-def estrai_frame_salienti(video_path, frame_per_secondo=1):
-    """
-    Copertura 100% (1 foto al secondo).
-    Comprime i frame in JPEG istantaneo per salvare la RAM.
-    """
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened(): return []
-
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps == 0 or fps != fps: fps = 25.0
-        
-    frame_interval = max(1, int(fps / frame_per_secondo))
-    
-    frames_estratti = []
-    count = 0
-    while True:
-        success, frame = cap.read()
-        if not success: break
-            
-        if count % frame_interval == 0:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            img_pil = Image.fromarray(frame_rgb)
-            img_pil.thumbnail((800, 800)) 
-            
-            buffer = io.BytesIO()
-            img_pil.save(buffer, format="JPEG", quality=70)
-            
-            frames_estratti.append({
-                "mime_type": "image/jpeg",
-                "data": buffer.getvalue()
-            })
-        count += 1
-        
-    cap.release()
-    return frames_estratti
-
-
-if not st.session_state['logged_in']:
-    st.markdown("<h1 style='text-align: center;'>🔒 Accesso Area Riservata</h1>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #94a3b8; margin-bottom: 30px;'>Inserisci le tue credenziali e il Codice Licenza fornito dall'amministratore.</p>", unsafe_allow_html=True)
-    
-    col_sx, col_centro, col_dx = st.columns([1, 1.5, 1])
-    with col_centro:
-        licenza = st.text_input("Codice Licenza Aziendale", placeholder="Es: LIC-ABCD-1234")
-        username = st.text_input("Nome Utente")
-        password = st.text_input("Password", type="password", on_change=trigger_login)
-        
-        btn_accedi = st.button("Accedi", use_container_width=True)
-        
-        if btn_accedi or st.session_state['do_login']:
-            st.session_state['do_login'] = False
-            
-            # ACCESSO ADMIN
-            if username == "Hydroadmin45" and password == "Hydremilio.368":
-                st.session_state['logged_in'] = True
-                st.session_state['is_admin'] = True
-                st.rerun()
-            # ACCESSO CLIENTE DINAMICO (Verifica DB)
-            else:
-                if not licenza or not username or not password:
-                    st.warning("⚠️ Compila tutti i campi per accedere.")
-                else:
-                    for tentativo in range(2): 
-                        try:
-                            response = supabase.table("licenze").select("*").eq("codice_licenza", licenza).eq("username", username).eq("password", password).execute()
-                            dati = response.data
-                            if len(dati) > 0:
-                                licenza_valida = dati[0].get("attiva", False)
-                                nome_cliente = dati[0].get("cliente", "Sconosciuto")
-                                if licenza_valida:
-                                    st.session_state['logged_in'] = True
-                                    st.session_state['is_admin'] = False
-                                    st.session_state['nome_cliente'] = nome_cliente
-                                    st.session_state['codice_licenza'] = licenza 
-                                    st.rerun()
-                                else:
-                                    st.error(f"🚫 La licenza di {nome_cliente} è stata DISATTIVATA dall'amministrazione.")
-                            else:
-                                st.error("❌ Credenziali errate o Licenza non valida.")
-                            break 
-                        except Exception as e:
-                            if tentativo == 0:
-                                time.sleep(1.5)
-                            else:
-                                st.error("Errore di rete: il server di sicurezza è temporaneamente irraggiungibile.")
-    
-    st.markdown("<br><hr style='border-color: #1e3a8a;'><br>", unsafe_allow_html=True)
-    col_v1, col_v2, col_v3 = st.columns(3)
-    with col_v1: st.markdown("<div class='info-card'><h4>⚡ Motore Enterprise</h4><p style='color: #94a3b8; font-size: 14px;'>Core IA per logiche complesse, classificazione normativa e grammatica peritale.</p></div>", unsafe_allow_html=True)
-    with col_v2: st.markdown("<div class='info-card'><h4>🔐 Impronta Crittografica</h4><p style='color: #94a3b8; font-size: 14px;'>Ogni report genera un hash forense univoco a prova di contestazione legale.</p></div>", unsafe_allow_html=True)
-    with col_v3: st.markdown("<div class='info-card'><h4>📊 Classificazione IQI</h4><p style='color: #94a3b8; font-size: 14px;'>Calcolo immediato dell'Indice di Priorità d'Intervento strutturale.</p></div>", unsafe_allow_html=True)
-
-else:
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=API_KEY)
-    
-    # --- VISUALE SUPER ADMIN ---
-    if st.session_state.get('is_admin'):
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            st.title("Pannello di Controllo Direzionale")
-        with col2:
-            if st.button("Esci (Logout)"):
-                st.session_state['logged_in'] = False
-                st.session_state['is_admin'] = False
-                st.session_state['delete_target'] = None
-                st.rerun()
-        st.markdown("---")
-
-        with st.expander("🛎️ Ticket di Assistenza Clienti", expanded=False):
-            try:
-                res_tickets = supabase.table("ticket_assistenza").select("*").order("id", desc=True).execute()
-                tickets = res_tickets.data
-                
-                if tickets:
-                    for t in tickets:
-                        bg_tk = "ticket-row" if t.get('stato') == 'Aperto' else "ticket-row ticket-resolved"
-                        stato_icon = "🟠 APERTO" if t.get('stato') == 'Aperto' else "🟢 RISOLTO"
+                        # --- CONFIGURAZIONE MODELLI E DIZIONARI NORMATIVI ---
+                        modello_visione = "gemini-3.8-flash" # Veloce per l'estrazione frame-by-frame
+                        modello_perito = "gemini-2.5-pro"    # Massima precisione per calcolo strutturale e QA
                         
-                        # Formattazione automatica della data e ora con Fuso Orario Italiano
-                        data_raw = t.get('created_at', 'N/D')
-                        if data_raw and data_raw != 'N/D':
+                        model_flash = genai.GenerativeModel(model_name=modello_visione)
+                        model_pro = genai.GenerativeModel(model_name=modello_perito)
+
+                        # --- SANITY CHECK AUTOMATICO (Primi 3 frame) ---
+                        with st.spinner("Verifica congruenza ambientale del flusso video..."):
+                            sample_check = [f["img"] for f in immagini_sospette[:3]]
+                            prompt_check = """Osserva questi fotogrammi. Rispondi SOLO con la parola 'OFFSHORE' se vedi un ambiente sottomarino/marino aperto (ROV, fondale sabbioso esterno, telemetria KP/DEPTH/DOL, condotta vista dall'esterno). 
+                            Rispondi SOLO con la parola 'FOGNATURA' se la telecamera è DENTRO un tubo chiuso (fognatura civile, scarico, pozzetti, PVC/cemento/gres visto dall'interno)."""
                             try:
-                                # Converte l'orario del server (UTC) in orario italiano
-                                if data_raw.endswith("Z"):
-                                    data_raw = data_raw[:-1] + "+00:00"
-                                dt_utc = datetime.fromisoformat(data_raw)
-                                dt_ita = dt_utc.astimezone(ZoneInfo("Europe/Rome"))
-                                data_formattata = dt_ita.strftime("%d/%m/%Y alle %H:%M")
-                            except Exception as e:
-                                data_formattata = data_raw
-                        else:
-                            data_formattata = "Data sconosciuta"
-                        
-                        c_tk_info, c_tk_act = st.columns([4.5, 1])
-                        with c_tk_info:
-                            st.markdown(f"""
-                            <div class="{bg_tk}">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                    <span style="font-weight: bold; font-size: 15px;">{t.get('cliente', 'N/D')} <span style="font-size: 12px; color: #94a3b8; font-weight: normal;">({t.get('codice_licenza', 'N/D')})</span></span>
-                                    <span style="font-size: 13px; font-weight: bold;">{stato_icon}</span>
-                                </div>
-                                <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 8px;">
-                                    <span style="color: #38bdf8;">🕒 <b>Ricevuto il:</b> {data_formattata}</span> <br>
-                                    <b>Oggetto:</b> {t.get('tipo_problema', 'N/D')} <br>
-                                    <b>Contatto:</b> {t.get('preferenza_contatto', 'N/D')} - {t.get('recapito', 'N/D')}
-                                </div>
-                                <div style="font-size: 13px; color: #e2e8f0; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
-                                    "{t.get('descrizione', 'N/D')}"
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        with c_tk_act:
-                            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                            if t.get('stato') == 'Aperto':
-                                if st.button("Segna Risolto", key=f"tk_{t['id']}", use_container_width=True):
-                                    supabase.table("ticket_assistenza").update({"stato": "Risolto"}).eq("id", t['id']).execute()
-                                    st.rerun()
-                            else:
-                                if st.button("🗑️ Elimina", key=f"tk_del_{t['id']}", use_container_width=True):
-                                    supabase.table("ticket_assistenza").delete().eq("id", t['id']).execute()
-                                    st.rerun()
-                else:
-                    st.info("Nessun ticket di assistenza presente.")
-            except Exception as e:
-                st.error(f"Nessun ticket (o tabella 'ticket_assistenza' non ancora creata).")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        with st.expander("💶 Cruscotto Finanziario (MRR & ARR)", expanded=False):
-            try:
-                res_fin = supabase.table("licenze").select("*").execute()
-                tutti_clienti = res_fin.data
-                clienti_attivi = sum(1 for c in tutti_clienti if c.get('attiva', False))
-                mrr_reale = sum(c.get('prezzo', 0) for c in tutti_clienti if c.get('attiva', False) and c.get('frequenza') == 'Mensile')
-                mrr_annuali = sum(c.get('prezzo', 0)/12 for c in tutti_clienti if c.get('attiva', False) and c.get('frequenza') == 'Annuale')
-                mrr_totale = mrr_reale + mrr_annuali
-                arr_totale = mrr_totale * 12
-            except:
-                clienti_attivi, mrr_totale, arr_totale = 0, 0, 0
-
-            st.markdown(f"""
-            <div style="display: flex; gap: 20px; margin-top: 5px;">
-                <div style="flex: 1; background: rgba(14, 165, 233, 0.1); border: 1px solid #0ea5e9; padding: 20px; border-radius: 12px; text-align: center;">
-                    <h5 style="color: #cbd5e1; margin: 0; font-size: 14px;">MRR (Incasso Mensile)</h5>
-                    <h2 style="color: #38bdf8; margin: 5px 0 0 0; font-size: 32px;">€ {mrr_totale:,.2f}</h2>
-                    <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Fatturato ricorrente calcolato dal DB</p>
-                </div>
-                <div style="flex: 1; background: rgba(16, 185, 129, 0.1); border: 1px solid #10b981; padding: 20px; border-radius: 12px; text-align: center;">
-                    <h5 style="color: #cbd5e1; margin: 0; font-size: 14px;">ARR (Incasso Annuale)</h5>
-                    <h2 style="color: #10b981; margin: 5px 0 0 0; font-size: 32px;">€ {arr_totale:,.2f}</h2>
-                    <p style="color: #94a3b8; font-size: 12px; margin: 5px 0 0 0;">Proiezione su 12 mesi</p>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        with st.expander("📚 Prontuario Commerciale (Pacchetti Listino)", expanded=False):
-            st.markdown("""
-            <p style='color: #94a3b8; font-size: 14px;'>Listino ufficiale differenziato tra <b>Impegno Annuale</b> (scontato per fare cassa) e <b>Mensile Flessibile</b> (maggiorato del 25% per disdetta libera).</p>
-            <table class="price-table">
-                <tr>
-                    <th>Nome Pacchetto</th>
-                    <th>Report Inclusi</th>
-                    <th>Prezzo Ann. Impegno (al mese)</th>
-                    <th>Prezzo Mensile Flessibile</th>
-                </tr>
-                <tr>
-                    <td><b>SMALL</b></td>
-                    <td>15 Report / mese</td>
-                    <td><b>290 € / mese</b></td>
-                    <td><b>350 € / mese</b></td>
-                </tr>
-                <tr>
-                    <td><b>MEDIUM</b></td>
-                    <td>50 Report / mese</td>
-                    <td><b>690 € / mese</b></td>
-                    <td><b>830 € / mese</b></td>
-                </tr>
-                <tr>
-                    <td><b>CORPORATE</b></td>
-                    <td>150 Report / mese</td>
-                    <td><b>1.490 € / mese</b></td>
-                    <td><b>1.790 € / mese</b></td>
-                </tr>
-            </table>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        with st.expander("📄 Generatore Modulo d'Ordine / Proposta B2B", expanded=False):
-            with st.form("form_contratto_b2b"):
-                c_ord1, c_ord2 = st.columns(2)
-                with c_ord1:
-                    cli_nome = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl")
-                    cli_piva = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890")
-                    cli_email = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it")
-                with c_ord2:
-                    tipo_piano = st.selectbox("Formula Commerciale", ("Abbonamento Annuale (Canone agevolato, impegno 12 mesi)", "Abbonamento Mensile Flessibile (Rinnovo automatico)"))
-                    
-                    # --- PREZZI DINAMICI IN BASE AL TIPO DI PIANO ---
-                    default_prezzo = 690 if "Annuale" in tipo_piano else 830
-                    prezzo_mensile = st.number_input("Canone Netto Concordato (€)", min_value=100, max_value=5000, value=default_prezzo)
-                    report_inclusi = st.number_input("Report mensili inclusi nel piano", min_value=10, max_value=500, value=50)
-                
-                btn_genera_pdf = st.form_submit_button("⚙️ Prepara Contratto in PDF", use_container_width=True)
-
-            if btn_genera_pdf:
-                if cli_nome and cli_piva:
-                    ordine_filename = f"Modulo_Ordine_HydroAegis_{cli_nome.replace(' ', '_')}.pdf"
-                    doc_ord = SimpleDocTemplate(ordine_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=30, bottomMargin=30)
-                    styles_ord = getSampleStyleSheet()
-                    style_titolo_ord = ParagraphStyle('TitleOrd', parent=styles_ord['Heading1'], fontSize=13, leading=16, spaceAfter=10, textColor=colors.HexColor("#0b1a30"))
-                    style_testo_ord = ParagraphStyle('TextOrd', parent=styles_ord['Normal'], fontSize=8.5, leading=11, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
-                    style_fiscale = ParagraphStyle('Fiscale', parent=styles_ord['Normal'], fontSize=7.5, leading=9.5, spaceAfter=4, textColor=colors.HexColor("#64748b"))
-                    style_doppia_firma = ParagraphStyle('DoppiaFirma', parent=styles_ord['Normal'], fontSize=7.5, leading=9.5, spaceAfter=8, textColor=colors.HexColor("#334155"), fontName="Helvetica-Oblique")
-                    
-                    dettaglio_durata = "• Durata Contratto: <b>12 (dodici) mesi</b> con impegno di fornitura ed esclusiva tariffa agevolata.<br/>• Condizioni di recesso: Impegno annuale, rinnovo automatico salvo disdetta 7 gg prima della scadenza." if "Annuale" in tipo_piano else "• Durata Contratto: <b>Mensile rinnovabile automaticamente</b>.<br/>• Condizioni di recesso: Disdicibile liberamente con preavviso scritto di almeno <b>7 (sette) giorni</b> prima del successivo rinnovo."
-
-                    story_ord = [
-                        Paragraph("<b>MODULO D'ORDINE E CONTRATTO DI ABBONAMENTO SaaS B2B</b>", style_titolo_ord),
-                        Paragraph("<b>HydroAegis AI – Piattaforma IA per Ispezioni e Certificazione Forense</b>", style_testo_ord),
-                        Spacer(1, 4),
-                        Paragraph(f"<b>1. DATI DEL COMMITTENTE:</b><br/>• Ragione Sociale: {cli_nome}<br/>• P.IVA / C.F.: {cli_piva}<br/>• Email Referente: {cli_email}", style_testo_ord),
-                        Spacer(1, 4),
-                        Paragraph(f"<b>2. SELEZIONE DEL PIANO E CORRISPETTIVI:</b><br/>• Formula Commerciale: <b>{tipo_piano}</b><br/>{dettaglio_durata}<br/>• Volume Incluso: Fino a <b>{report_inclusi} Report Certificati</b> mensili.<br/>• <b>CANONE IMPONIBILE: € {prezzo_mensile:.2f}</b><br/><i>*Operazione attualmente in franchigia da IVA (Regime Forfettario). In caso di variazione del regime fiscale del Fornitore, l'IVA di legge (22%) verrà aggiunta in fattura e risulterà interamente detraibile dal Committente, mantenendo invariato il costo netto pattuito.</i>", style_testo_ord),
-                        Spacer(1, 4),
-                        Paragraph(f"<b>3. TERMINI DI PAGAMENTO E RISOLUZIONE:</b><br/>• Metodo di Pagamento: Addebito automatico su metodo di pagamento registrato (Carta/SEPA) o Bonifico Bancario anticipato.<br/>• Decorrenza: Dalla ricezione del presente modulo controfirmato.<br/>• Rinnovo: <b>Automatico</b> alla scadenza del periodo, salvo disdetta formale inviata almeno 7 giorni prima.<br/>• <b>Clausola Risolutiva (Art. 1456 c.c.):</b> Il mancato pagamento comporta la disattivazione immediata della licenza.", style_testo_ord),
-                        Spacer(1, 4),
-                        Paragraph("<b>4. CLAUSOLA FISCALE PRE-APERTURA:</b><br/>Il Committente prende formalmente atto che l'entità giuridica del Fornitore (HydroAegis) è attualmente in fase di formale costituzione e attribuzione del numero di Partita IVA. La prima fatturazione utile verrà emessa non appena la posizione fiscale sarà attiva, inglobando i canoni maturati a partire dalla data di attivazione dell'abbonamento.", style_testo_ord),
-                        Spacer(1, 4),
-                        Paragraph("<b>5. LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b><br/>Il software costituisce uno strumento di supporto decisionale. La validazione tecnica dei dati e la classificazione alla norma EN 13508-2 restano ad esclusivo carico del tecnico abilitato del Committente. Il Fornitore è manlevato da responsabilità inerenti le decisioni di cantiere.", style_testo_ord),
-                        Spacer(1, 4),
-                        Paragraph("<b>6. FORZA MAGGIORE E SLA:</b><br/>Il servizio è fornito 'as is' dipendendo da Cloud di terze parti. Il Fornitore non assume responsabilità per disservizi o ritardi imputabili a interruzioni di rete o API.", style_testo_ord),
-                        Spacer(1, 4),
-                        Paragraph("<b>7. PROPRIETÀ INTELLETTUALE E FORO COMPETENTE:</b><br/>I dati restano di proprietà del Committente (GDPR UE 2016/679) e non formano IA pubbliche. Per le controversie sarà competente in via esclusiva il Foro del Fornitore.", style_testo_ord),
-                        Spacer(1, 10),
-                        Paragraph("<b>Luogo e Data:</b> _________________________ &nbsp;&nbsp;&nbsp;&nbsp; <b>Il Committente (Firma):</b> _________________________", style_testo_ord),
-                        Spacer(1, 14),
-                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 C.C., il Committente dichiara di approvare specificamente le clausole: <b>3</b> (Pagamento e Rinnovo Automatico), <b>4</b> (Clausola Fiscale Pre-Apertura), <b>5</b> (Limitazione Responsabilità), <b>6</b> (Forza Maggiore) e <b>7</b> (Foro Competente).", style_doppia_firma),
-                        Spacer(1, 8),
-                        Paragraph("<b>Il Committente (Seconda Firma Obbligatoria):</b> _________________________", style_testo_ord),
-                        Spacer(1, 20),
-                        Paragraph("<i>Operazione in franchigia da IVA ai sensi dell'art. 1, commi da 54 a 89, L. 190/2014. Importo soggetto a imposta di bollo di € 2,00 (assolta in fattura elettronica) se superiore a € 77,47.</i>", style_fiscale)
-                    ]
-                    doc_ord.build(story_ord)
-                    with open(ordine_filename, "rb") as f_ord:
-                        st.session_state['pdf_ord_bytes'] = f_ord.read()
-                        st.session_state['pdf_ord_name'] = ordine_filename
-            if 'pdf_ord_bytes' in st.session_state:
-                st.download_button("⬇️ SCARICA IL CONTRATTO B2B", data=st.session_state['pdf_ord_bytes'], file_name=st.session_state['pdf_ord_name'], mime="application/pdf")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("🚀 Generatore Accordo Early-Bird (7 Giorni Prova + Abbonamento)", expanded=False):
-            st.markdown("<p style='color: #94a3b8; font-size: 13px;'>Usa questo modulo per i primissimi clienti. Prevede 7 giorni di prova gratuiti, scaduti i quali si attiva in automatico l'abbonamento. Include la clausola di P.IVA in via di attribuzione.</p>", unsafe_allow_html=True)
-            with st.form("form_early_bird"):
-                c_eb1, c_eb2 = st.columns(2)
-                with c_eb1:
-                    cli_nome_eb = st.text_input("Ragione Sociale Azienda", placeholder="Es. Idrica Srl", key="eb_nome")
-                    cli_piva_eb = st.text_input("Partita IVA / C.F.", placeholder="Es. 01234567890", key="eb_piva")
-                    cli_email_eb = st.text_input("Email Referente", placeholder="ing.rossi@idricasrl.it", key="eb_email")
-                with c_eb2:
-                    tipo_piano_eb = st.selectbox("Formula Successiva (Post-Prova)", ("Abbonamento Annuale (Canone agevolato)", "Abbonamento Mensile Flessibile"), key="eb_piano")
-                    prezzo_mensile_eb = st.number_input("Canone Netto Post-Prova (€)", min_value=100, max_value=5000, value=690, key="eb_prezzo")
-                    report_inclusi_eb = st.number_input("Report mensili inclusi", min_value=10, max_value=500, value=50, key="eb_report")
-                    crediti_prova_eb = st.number_input("Crediti Gratuiti (Prova)", min_value=1, max_value=20, value=3, key="eb_prova")
-                
-                btn_genera_eb = st.form_submit_button("⚙️ Prepara Accordo Early-Bird in PDF", use_container_width=True)
-
-            if btn_genera_eb:
-                if cli_nome_eb and cli_piva_eb:
-                    eb_filename = f"Accordo_Prova_Vincolata_{cli_nome_eb.replace(' ', '_')}.pdf"
-                    doc_eb = SimpleDocTemplate(eb_filename, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=30, bottomMargin=30)
-                    
-                    # Usa gli stili definiti in precedenza (li ricreiamo per sicurezza nel blocco)
-                    styles_eb = getSampleStyleSheet()
-                    style_titolo_eb = ParagraphStyle('TitleEB', parent=styles_eb['Heading1'], fontSize=13, leading=16, spaceAfter=10, textColor=colors.HexColor("#0b1a30"))
-                    style_testo_eb = ParagraphStyle('TextEB', parent=styles_eb['Normal'], fontSize=8.5, leading=11, spaceAfter=6, textColor=colors.HexColor("#1e293b"))
-                    style_fiscale_eb = ParagraphStyle('FiscaleEB', parent=styles_eb['Normal'], fontSize=7.5, leading=9.5, spaceAfter=4, textColor=colors.HexColor("#64748b"))
-                    style_firma_eb = ParagraphStyle('FirmaEB', parent=styles_eb['Normal'], fontSize=7.5, leading=9.5, spaceAfter=8, textColor=colors.HexColor("#334155"), fontName="Helvetica-Oblique")
-                    
-                    story_eb = [
-                        Paragraph("<b>CONTRATTO DI PROVA GRATUITA (TRIAL) E CONVERSIONE IN ABBONAMENTO SaaS B2B</b>", style_titolo_eb),
-                        Spacer(1, 6),
-                        Paragraph("Con il presente accordo privato, da valere a tutti gli effetti di legge,", style_testo_eb),
-                        Spacer(1, 4),
-                        Paragraph("<b>TRA</b>", style_testo_eb),
-                        Paragraph("<b>Fornitore:</b> HydroAegis (attualmente in fase di costituzione formale e attribuzione P.IVA, con sede in Via Campagna 18, 21036 Gemonio - VA, email: info@hydroaegis.it), di seguito denominato \"Fornitore\" o \"HydroAegis\"", style_testo_eb),
-                        Spacer(1, 4),
-                        Paragraph("<b>E</b>", style_testo_eb),
-                        Paragraph(f"<b>Cliente (Committente):</b> {cli_nome_eb}, P.IVA/C.F.: {cli_piva_eb}, Email: {cli_email_eb}, di seguito denominato \"Cliente\"", style_testo_eb),
-                        Spacer(1, 8),
-                        Paragraph("<b>SI CONVIENE E SI STIPULA QUANTO SEGUE:</b>", style_testo_eb),
-                        Spacer(1, 6),
-                        Paragraph("<b>ART. 1 - OGGETTO DEL CONTRATTO E OBBLIGAZIONI DELLE PARTI</b><br/>HydroAegis si impegna a fornire al Cliente l'accesso in licenza d'uso alla propria piattaforma cloud di Intelligenza Artificiale per l'analisi forense e la classificazione (norma EN 13508-2) delle ispezioni video di reti fognarie e tubazioni. Il Cliente si impegna a utilizzare la piattaforma esclusivamente per i propri fini aziendali interni e a mantenere la stretta riservatezza sulle credenziali di accesso fornite.", style_testo_eb),
-                        Spacer(1, 4),
-                        Paragraph(f"<b>ART. 2 - PERIODO DI PROVA GRATUITO (FASE 1)</b><br/>HydroAegis concede al Cliente un periodo di prova a titolo totalmente gratuito della durata di <b>7 (sette) giorni solari</b> a partire dall'attivazione dell'account, comprensivo di <b>{crediti_prova_eb} report certificati gratuiti</b>. Durante tale periodo, il Cliente potrà valutare l'accuratezza del sistema senza alcun onere economico o vincolo.", style_testo_eb),
-                        Spacer(1, 4),
-                        Paragraph(f"<b>ART. 3 - SOTTOSCRIZIONE E CONVERSIONE AUTOMATICA (FASE 2)</b><br/>Qualora il Cliente non invii formale disdetta scritta (via email) entro e non oltre le ore 23:59 del settimo giorno di prova, il presente accordo <b>si convertirà in automatico in un regolare contratto di abbonamento</b> alle seguenti condizioni commerciali:<br/>• Formula Commerciale: <b>{tipo_piano_eb}</b><br/>• Volume Incluso: Fino a <b>{report_inclusi_eb} Report Certificati</b> al mese.<br/>• <b>CANONE IMPONIBILE: € {prezzo_mensile_eb:.2f} / mese</b>", style_testo_eb),
-                        Spacer(1, 4),
-                        Paragraph("<b>ART. 4 - CLAUSOLA FISCALE TRANSITORIA PRE-APERTURA</b><br/>Il Cliente prende atto ed accetta che l'entità giuridica HydroAegis è in via di definitiva attribuzione della Partita IVA. La prima fatturazione utile verrà emessa non appena la posizione fiscale sarà attiva, inglobando i canoni mensili maturati a partire dalla data di effettiva conversione in abbonamento.", style_testo_eb),
-                        Spacer(1, 4),
-                        Paragraph("<b>ART. 5 - LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP)</b><br/>La piattaforma SaaS costituisce esclusivamente uno strumento algoritmico di supporto decisionale. La validazione tecnica dei dati, la congruità alla norma e la responsabilità delle decisioni di cantiere restano a totale ed esclusivo carico del tecnico abilitato del Cliente. HydroAegis è manlevata da qualsiasi responsabilità per danni diretti o indiretti derivanti dall'utilizzo dei report generati.", style_testo_eb),
-                        Spacer(1, 10),
-                        Paragraph("<b>Luogo e Data:</b> _________________________ &nbsp;&nbsp;&nbsp;&nbsp; <b>Il Cliente (Firma):</b> _________________________", style_testo_eb),
-                        Spacer(1, 14),
-                        Paragraph("Ai sensi e per gli effetti degli artt. 1341 e 1342 C.C., il Cliente dichiara di aver letto, compreso e di approvare specificamente per iscritto le clausole di cui agli Articoli: <b>3</b> (Sottoscrizione e Conversione Automatica), <b>4</b> (Clausola Fiscale Transitoria) e <b>5</b> (Limitazione di Responsabilità).", style_firma_eb),
-                        Spacer(1, 8),
-                        Paragraph("<b>Il Cliente (Seconda Firma Obbligatoria):</b> _________________________", style_testo_eb),
-                    ]
-                    
-                    doc_eb.build(story_eb)
-                    with open(eb_filename, "rb") as f_eb:
-                        st.session_state['pdf_eb_bytes'] = f_eb.read()
-                        st.session_state['pdf_eb_name'] = eb_filename
-                        
-            if 'pdf_eb_bytes' in st.session_state:
-                st.download_button("⬇️ SCARICA ACCORDO EARLY-BIRD", data=st.session_state['pdf_eb_bytes'], file_name=st.session_state['pdf_eb_name'], mime="application/pdf")
-        
-        with st.expander("📦 Gestione Ricarica Crediti Extra (Pacchetti Report)", expanded=False):
-            try:
-                res_cli = supabase.table("licenze").select("codice_licenza, cliente, limite_report").execute()
-                lista_clienti = res_cli.data
-            except:
-                lista_clienti = []
-                
-            if lista_clienti:
-                clienti_dict = {f"{c['cliente']} ({c['codice_licenza']})": c['codice_licenza'] for c in lista_clienti}
-                scelta_cliente_extra = st.selectbox("Seleziona Azienda Cliente", options=list(clienti_dict.keys()))
-                
-                c_ex1, c_ex2 = st.columns(2)
-                with c_ex1: qt_report_extra = st.number_input("Numero Report Extra nel Pacchetto", min_value=5, max_value=200, value=10)
-                with c_ex2: prezzo_pacchetto = st.number_input("Prezzo Totale Pacchetto (€ - Netto)", min_value=50, max_value=2000, value=250)
-                
-                if st.button("⚡ Aggiungi Report al Cliente", use_container_width=True):
-                    cod_selezionato = clienti_dict[scelta_cliente_extra]
-                    attuale = supabase.table("licenze").select("limite_report").eq("codice_licenza", cod_selezionato).execute().data[0]['limite_report']
-                    supabase.table("licenze").update({"limite_report": attuale + int(qt_report_extra)}).eq("codice_licenza", cod_selezionato).execute()
-                    st.success(f"✅ Aggiunti {qt_report_extra} report extra a {scelta_cliente_extra}!")
-            else:
-                st.info("Nessun cliente registrato.")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("💼 Simulatore di Prezzo e ROI per Trattativa Commerciale", expanded=False):
-            c_r1, c_r2 = st.columns(2)
-            with c_r1: ore_video_mese = st.number_input("Ore di video analizzate al mese:", min_value=1, max_value=500, value=20)
-            with c_r2: costo_orario_tecnico = st.number_input("Costo orario tecnico (stipendio + oneri):", min_value=15, max_value=100, value=35)
-            
-            ore_risparmiate = ore_video_mese * 2.5
-            risparmio = ore_risparmiate * costo_orario_tecnico
-            prezzo_consigliato = max(290, round(risparmio * 0.3, -1))
-            st.markdown(f"""
-            <div class="roi-box">
-                <p>🕒 Ore umane risparmiate: <b>{ore_risparmiate:.1f} ore/mese</b></p>
-                <p>💸 Costo manuale sprecato: <b>{risparmio:,.2f} € / mese</b></p>
-                <p style="color: #38bdf8; font-size: 18px;">💡 <b>Prezzo Vendita Suggerito: {prezzo_consigliato:,.0f} € / mese</b></p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("➕ Aggiungi Nuovo Cliente (Attivazione Licenza e Password)", expanded=False):
-            
-            if 'input_cliente' not in st.session_state: st.session_state['input_cliente'] = ""
-            st.session_state['input_cliente'] = st.text_input("Ragione Sociale Azienda Cliente", value=st.session_state['input_cliente'])
-            
-            c_log1, c_log2 = st.columns(2)
-            with c_log1:
-                nuovo_username = st.text_input("Username per il Cliente (Es. idrica_srl)", placeholder="Nessuno spazio")
-            with c_log2:
-                nuova_password = st.text_input("Password per il Cliente", placeholder="Inserisci una password sicura")
-            
-            col_l1, col_l2 = st.columns([3, 1])
-            with col_l1: 
-                if 'input_licenza_tmp' not in st.session_state: st.session_state['input_licenza_tmp'] = ""
-                st.session_state['input_licenza_tmp'] = st.text_input("Codice Licenza Generato", value=st.session_state['input_licenza_tmp'])
-            with col_l2:
-                st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-                if st.button("Genera Codice", use_container_width=True):
-                    st.session_state['input_licenza_tmp'] = genera_codice()
-                    st.rerun()
-                    
-            col_d1, col_d2, col_d3 = st.columns(3)
-            with col_d1: limite_impostato = st.number_input("Report mensili inclusi:", min_value=5, max_value=1000, value=50)
-            with col_d2: frequenza_scelta = st.selectbox("Frequenza Pagamento (Nuovo)", ["Mensile Flessibile", "Annuale"])
-            
-            # Prezzo predefinito basato sulla scelta frequenza nel form di creazione
-            def_crea = 830 if frequenza_scelta == "Mensile Flessibile" else 690
-            with col_d3: prezzo_inserito = st.number_input("Prezzo Concordato (€)", min_value=0, max_value=10000, value=def_crea)
-
-            if st.button("✅ Salva Nuova Licenza e Credenziali", use_container_width=True):
-                if st.session_state['input_cliente'] and st.session_state['input_licenza_tmp'] and nuovo_username and nuova_password:
-                    oggi = datetime.now()
-                    str_oggi = oggi.strftime("%d/%m/%Y")
-                    prossimo = (oggi + relativedelta(months=1)).strftime("%d/%m/%Y") if "Mensile" in frequenza_scelta else (oggi + relativedelta(years=1)).strftime("%d/%m/%Y")
-                    try:
-                        supabase.table("licenze").insert({
-                            "cliente": st.session_state['input_cliente'], 
-                            "codice_licenza": st.session_state['input_licenza_tmp'], 
-                            "username": nuovo_username,
-                            "password": nuova_password,
-                            "attiva": True, 
-                            "limite_report": limite_impostato, 
-                            "report_consumati": 0, 
-                            "prezzo": prezzo_inserito, 
-                            "frequenza": frequenza_scelta, 
-                            "ultimo_pagamento": str_oggi, 
-                            "prossimo_rinnovo": prossimo
-                        }).execute()
-                        st.success("✅ Cliente creato con successo! Manda al cliente Username, Password e Codice Licenza.")
-                        st.session_state['input_cliente'] = ""
-                        st.session_state['input_licenza_tmp'] = ""
-                        time.sleep(2)
-                        st.rerun()
-                    except Exception as e: 
-                        st.error(f"Errore DB: {e}. (Assicurati di aver aggiunto le colonne 'username' e 'password' su Supabase).")
-                else: 
-                    st.warning("⚠️ Compila tutti i campi: Ragione Sociale, Username, Password e Codice Licenza.")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("👥 Database Clienti e Pagamenti (Riservato)", expanded=False):
-            ricerca = st.text_input("🔍 Cerca per nome o codice...", placeholder="Digita qui...")
-            try:
-                risposta = supabase.table("licenze").select("*").order("id", desc=True).execute()
-                dati_licenze = risposta.data
-                if ricerca: dati_licenze = [d for d in dati_licenze if ricerca.lower() in d['cliente'].lower() or ricerca.lower() in d['codice_licenza'].lower()]
-                if dati_licenze:
-                    for riga in dati_licenze:
-                        if st.session_state['delete_target'] == riga['codice_licenza']:
-                            st.warning(f"⚠️ Eliminare '{riga['cliente']}'?")
-                            col_yes, col_no, _ = st.columns([1, 1, 3])
-                            with col_yes:
-                                if st.button("Sì, Elimina", key=f"yes_{riga['codice_licenza']}", use_container_width=True):
-                                    supabase.table("licenze").delete().eq("codice_licenza", riga['codice_licenza']).execute()
-                                    st.session_state['delete_target'] = None
-                                    st.rerun()
-                            with col_no:
-                                if st.button("Annulla", key=f"no_{riga['codice_licenza']}", use_container_width=True):
-                                    st.session_state['delete_target'] = None
-                                    st.rerun()
-                        else:
-                            bg_class = "client-row" if riga['attiva'] else "client-row client-suspended"
-                            c_del, c_info, c_act = st.columns([0.4, 4.5, 1])
-                            with c_del:
-                                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                                if st.button("❌", key=f"del_{riga['codice_licenza']}"):
-                                    st.session_state['delete_target'] = riga['codice_licenza']
-                                    st.rerun()
-                            with c_info:
-                                # Calcolo Costi e Margini (Visibile solo a te)
-                                report_fatti = riga.get('report_consumati', 0)
-                                costo_stimato_api = report_fatti * 0.15 # Costo medio di 15 centesimi a report con modello Flash
-                                prezzo_cliente = riga.get('prezzo', 0)
-                                margine_netto = prezzo_cliente - costo_stimato_api
-
-                                st.markdown(f"""
-                                <div class="{bg_class}">
-                                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                                        <span style="font-weight: bold; font-size: 16px;">{riga['cliente']}</span>
-                                        <span style="font-size: 14px; color: #38bdf8;">€ {prezzo_cliente} ({riga.get('frequenza','N/D')})</span>
-                                        <span style="font-family: monospace; color: #94a3b8;">{riga['codice_licenza']}</span>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1;">
-                                        <span><b>User/Pass:</b> {riga.get('username','N/D')} / {riga.get('password','N/D')}</span>
-                                        <span><b>Report:</b> {report_fatti}/{riga.get('limite_report',50)}</span>
-                                        <span style="color: {'#10b981' if riga['attiva'] else '#ef4444'};"><b>Prox Rinnovo:</b> {riga.get('prossimo_rinnovo','N/D')}</span>
-                                    </div>
-                                    <div style="display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #334155;">
-                                        <span style="color: #f43f5e;"><b>📉 Spesa API Google:</b> ~ {costo_stimato_api:.2f} €</span>
-                                        <span style="color: #10b981;"><b>💰 Margine Netto:</b> ~ {margine_netto:.2f} €</span>
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            with c_act:
-                                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-                                lbl = "Sospendi" if riga['attiva'] else "Riattiva"
-                                if st.button(lbl, key=f"btn_{riga['codice_licenza']}", use_container_width=True):
-                                    supabase.table("licenze").update({"attiva": not riga['attiva']}).eq("codice_licenza", riga['codice_licenza']).execute()
-                                    st.rerun()
-            except Exception as e: 
-                st.error(f"Errore di sistema nel database clienti: {e}")
-                
-    # --- VISUALE CLIENTE ---
-    else:
-        dati_cliente = None
-        if 'codice_licenza' in st.session_state:
-            try:
-                check = supabase.table("licenze").select("*").eq("codice_licenza", st.session_state['codice_licenza']).execute()
-                if not check.data or not check.data[0].get("attiva", False):
-                    st.session_state['logged_in'] = False
-                    st.rerun()
-                else: dati_cliente = check.data[0]
-            except: pass
-                
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            st.title("🔍 Piattaforma di Ispezione Automatica")
-            cliente_nome = st.session_state.get('nome_cliente', 'Cliente')
-            limite_totale = dati_cliente.get('limite_report', 50) if dati_cliente else 50
-            report_fatti = dati_cliente.get('report_consumati', 0) if dati_cliente else 0
-            prox_rinnovo = dati_cliente.get('prossimo_rinnovo', 'N/D') if dati_cliente else 'N/D'
-            
-            st.markdown(f"""Benvenuto, **{cliente_nome}** &nbsp;|&nbsp; 
-                        <span style='font-size: 13px; color: #38bdf8; background: rgba(14, 165, 233, 0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(14, 165, 233, 0.3);'>📊 Crediti: {report_fatti} / {limite_totale} Report</span>
-                        &nbsp;|&nbsp; <span style='font-size: 12px; color: #94a3b8;'>Rinnovo Licenza: {prox_rinnovo}</span>
-                        """, unsafe_allow_html=True)
-        with col2:
-            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-            if st.button("Esci (Logout)", use_container_width=True):
-                st.session_state['logged_in'] = False
-                st.session_state['is_admin'] = False
-                st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        tipo_ispezione = st.selectbox("Seleziona l'ambiente:", ("Tubazione Sottomarina (ROV)", "Fognatura / Rete Stradale civile"), index=None, placeholder="Seleziona...")
-        
-        formati = ["mp4", "mov", "avi", "mpeg", "wmv", "webm", "wav", "mp3", "flac", "aac", "ogg"]
-        uploaded_file = st.file_uploader("Trascina qui il file video o audio dell'ispezione", type=formati)
-
-        if uploaded_file is not None:
-            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
-            if file_ext in ['.pdf', '.docx', '.doc', '.txt', '.xlsx']: 
-                st.error("🚫 Formato non supportato. Carica un file video o audio.")
-            else:
-                if (uploaded_file.size / (1024 * 1024)) > 2000: 
-                    st.error("🚫 File superiore a 2GB (circa 1 ora di video). Si consiglia di dividerlo in due parti.")
-                elif report_fatti >= limite_totale: 
-                    st.error("🚫 Crediti esauriti. Contatta l'amministratore tramite il modulo in basso per ricaricare.")
-                else:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    
-                    if st.button("Avvia Analisi Enterprise", use_container_width=True):
-                        
-                        if not tipo_ispezione:
-                            st.warning("⚠️ Attenzione: Seleziona prima l'ambiente dal menu a tendina in alto.")
-                            st.stop()
-                            
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp_file:
-                            tmp_file.write(uploaded_file.read())
-                            tmp_file_path = tmp_file.name
-                        
-                        st.session_state['file_hash'] = calcola_hash_file(tmp_file_path)
-                        
-                        # --- FASE 1: Estrazione ---
-                        with st.spinner("Fase 1/3: Scansione forense totale (1 foto/sec)..."):
-                            try:
-                                immagini_sospette = estrai_frame_salienti(tmp_file_path, frame_per_secondo=1)
-                                if not immagini_sospette:
-                                    st.error("🚫 Errore: Impossibile estrarre i fotogrammi.")
+                                esito_check = model_flash.generate_content(sample_check + [prompt_check]).text.strip().upper()
+                                if "OFFSHORE" in esito_check and tipo_ispezione == "Fognatura / Rete Stradale civile":
+                                    st.error("🚫 ERRORE DI CONGRUENZA: Hai selezionato 'Fognatura / Rete Stradale civile', ma il video mostra un'ispezione sottomarina esterna (Offshore ROV). Seleziona 'Tubazione Sottomarina (ROV)' per applicare gli standard DNV corretti. (Nessun credito è stato scalato).")
+                                    if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
                                     st.stop()
-                                st.info(f"✅ Estratti {len(immagini_sospette)} fotogrammi. Inizio elaborazione a blocchi...")
-                            except Exception as e:
-                                st.error(f"⚠️ Errore locale: {e}")
-                                st.stop()
-                                
-                        # --- FASE 2: Chunking su Gemini Flash ---
-                        modello_ideale = "gemini-3.8-flash"
-                        model = genai.GenerativeModel(model_name=modello_ideale)
-                        
+                                elif "FOGNATURA" in esito_check and tipo_ispezione == "Tubazione Sottomarina (ROV)":
+                                    st.error("🚫 ERRORE DI CONGRUENZA: Hai selezionato 'Tubazione Sottomarina (ROV)', ma il video mostra l'interno di una condotta fognaria civile. Seleziona 'Fognatura / Rete Stradale civile' per applicare la norma EN 13508-2. (Nessun credito è stato scalato).")
+                                    if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
+                                    st.stop()
+                            except Exception:
+                                pass # Se il check fallisce per rete, procede comunque
+
+                        # --- IMPOSTAZIONE REGOLE PER AMBIENTE ---
+                        if tipo_ispezione == "Tubazione Sottomarina (ROV)":
+                            standard_normativo = "DNV-ST-F101 / DNV-RP-F105 (Submarine Pipeline Systems)"
+                            ruolo = "Sei un Senior Subsea Pipeline Inspector certificato secondo gli standard offshore DNV-ST-F101, DNV-RP-F105 e IMCA."
+                            istruzioni_specifiche_fase1 = """
+                            STAI ANALIZZANDO L'ESTerno DI UNA CONDOTTA SOTTOMARINA TRAMITE ROV.
+                            1. OCR TELEMETRICO OSD (OBBLIGATORIO): Leggi con precisione chirurgica i dati sovraimpressi nel video:
+                               - KP (Kilometer Post, es. KP 1.0994 -> converti anche in metri 1099.40 m)
+                               - DEPTH (Profondità batimetrica in metri, es. 92.9 m)
+                               - DOL (Depth of Lowering / grado di interro, es. DOL -0.14 o +0.45)
+                            2. CODICI EVENTO OFFSHORE AMMESSI (VIETATO USARE CODICI EN 13508-2 COME BAA/BDA/BAC):
+                               - [FREE SPAN]: Campata libera / tubo sospeso con luce passante sotto la generatrice inferiore (ore 06). Indica inizio, fine e touchdown point.
+                               - [FIELD JOINT]: Giunto saldato di campo / manicotto termoretraibile / marcatura numerica stencilata (es. "0088", "0089", "0094").
+                               - [ANODE]: Anodo sacrificale a bracciale (bracelet anode) per protezione catodica e relativo stato di consumo galvanico.
+                               - [COATING / CWC]: Stato del rivestimento anticorrosivo o Concrete Weight Coating.
+                               - [BURIAL / SCOUR]: Insabbiamento parziale, berme di sedimento o scalzamento.
+                               - [BIOFOULING / FAUNA]: Incrostazioni marine, organismi sessili o fauna bentonica.
+                               - [TURBIDITY]: Nube di limo/fango sollevata dai propulsori ROV che riduce la visibilità.
+                            3. FORMATO RIGA OBBLIGATORIO:
+                               • [KP esatto e Metri] | [DEPTH e DOL letti a video] | [CODICE EVENTO OFFSHORE] | [Posizione Oraria] | [Confidenza: ALTA/MEDIA/BASSA] - [Descrizione tecnica]
+                            """
+                            istruzioni_specifiche_fase3 = """
+                            STRUTTURA OBBLIGATORIA DEL RAPPORTO OFFSHORE (STANDARD DNV):
+                            VIETATO USARE LA PAROLA 'POZZETTO' (usa 'Punto Chilometrico KP'). VIETATO USARE CODICI EN 13508-2 (BAA, BAC, BDA, ecc.).
+                            
+                            SEZIONE 1: RILEVAZIONE ANOMALIE E REGISTRO EVENTI (SURVEY LOG)
+                            Tratta sottomarina ispezionata: da KP [Inizio] a KP [Fine] (Quota batimetrica media: [X] m).
+                            (Accorpa i frame consecutivi dello stesso evento in un unico intervallo KP Inizio - KP Fine calcolando la lunghezza in metri L = X.XX m).
+                            Ogni riga deve iniziare con "• " ed avere questo formato esatto:
+                            • [KP Inizio - KP Fine (Lunghezza m)] | [DOL: X.XX m] | [CODICE EVENTO DNV] | [Ore XX] | [Confidenza: XX%] - [Descrizione peritale. Se Confidenza < 75% per torbidità, aggiungi: [REVISIONE MANUALE CONSIGLIATA - VISIBILITÀ DEGRADATA]]
+
+                            SEZIONE 2: CLASSIFICAZIONE SEVERITÀ E INTEGRITÀ (PIPELINE INTEGRITY RATING)
+                            (Paragrafo tecnico che classifica gli eventi in Classe di Severità 1-Trascurabile, 2-Monitoraggio Ordinario, 3-Attenzione Tecnica/Calcolo Fatica, valutando rivestimento CWC, consumo anodi a bracciale e campate libere).
+
+                            SEZIONE 3: VALUTAZIONE STRUTTURALE E SCREENING VIV (DNV-RP-F105)
+                            (Analisi ingegneristica delle lunghezze di Free Span rilevate rispetto alle soglie critiche per Vortex-Induced Vibrations - VIV, stabilità geotecnica, protezione catodica e prescrizioni operative per il committente).
+                            """
+                        else:
+                            standard_normativo = "UNI EN 13508-2 (Sistemi di fognature e scarico)"
+                            ruolo = "Sei un Ingegnere Civile Idraulico e Ispettore certificato UNI EN 13508-2."
+                            istruzioni_specifiche_fase1 = """
+                            STAI ANALIZZANDO L'INTERNO DI UNA CONDOTTA FOGNARIA CIVILE/STRADALE.
+                            1. OCR TELEMETRICO OSD: Leggi la progressiva metrica esatta impressa a schermo (es. 14.50 m).
+                            2. DIZIONARIO RIGIDO CODICI UNI EN 13508-2 (USA SOLO QUESTI CODICI CORRISPONDENTI):
+                               - BAA A: Fessurazione/Frattura longitudinale | BAA B: Frattura circonferenziale | BAA C: Frattura complessa/a ragnatela
+                               - BAB: Deformazione flessibile/ovalizzazione della sezione
+                               - BAC: Collasso / Crollo parziale o totale della parete con terreno a vista
+                               - BAF: Difetto del giunto (disassamento, sfilamento, guarnizione sporgente/visibile)
+                               - BBA: Depositi sedimentari sul fondo (sabbia, ghiaia, incrostazioni calcaree) con % di riduzione sezione
+                               - BBB: Intrusione di radici (a ciuffo o a massa compatta)
+                               - BBC: Ostruzioni / Corpi estranei puntuali
+                               - BDA: Allacciamento laterale (conforme, sporgente/intrusivo o difettoso)
+                               - BDC: Perdita di visibilità / Telecamera sommersa da battente idrico o fango
+                            3. FORMATO RIGA OBBLIGATORIO:
+                               • [Metratura esatta m] | [Codice EN 13508-2] | [Posizione Oraria es. Ore 12 o Ore 04-08] | [Confidenza: ALTA/MEDIA/BASSA] - [Descrizione clinica e % riduzione sezione]
+                            """
+                            istruzioni_specifiche_fase3 = """
+                            STRUTTURA OBBLIGATORIA DEL RAPPORTO FOGNARIO (NORMA UNI EN 13508-2):
+                            
+                            SEZIONE 1: RILEVAZIONE ANOMALIE (CODIFICA UNI EN 13508-2)
+                            Tratta ispezionata: dal Pozzetto [Nodo Monte] al Pozzetto [Nodo Valle] (Lunghezza totale: [X] m).
+                            Ogni riga deve iniziare con "• " ed avere questo formato esatto:
+                            • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] | [Confidenza: XX%] - [Descrizione peritale con stima % riduzione diametro. Se visibilità scarsa aggiungi: [REVISIONE MANUALE CONSIGLIATA]]
+
+                            SEZIONE 2: CLASSIFICAZIONE IQI (INDICE DI QUALITÀ E PRIORITÀ D'INTERVENTO)
+                            (Paragrafo tecnico discorsivo sull'Indice di Priorità strutturale e funzionale da 1 a 5 secondo EN 13508-2).
+
+                            SEZIONE 3: VALUTAZIONE STRUTTURALE E PIANO DI RISANAMENTO
+                            (Analisi statica, tenuta idraulica e prescrizioni di intervento: lavaggio canal-jet, fresatura robotizzata, relining CIPP o scavo puntuale).
+                            """
+
+                        st.session_state['standard_usato'] = standard_normativo
+
+                        # --- FASE 2: Analisi Visiva a Blocchi ---
                         bozze_parziali = []
-                        batch_size = 150 # Numero sicuro per non sforare i token
-                        
-                        ruolo = "Sei un Ingegnere Ispettore certificato EN 13508-2." if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "Sei un Ingegnere Civile certificato EN 13508-2."
+                        batch_size = 80 # Ottimale per non perdere dettagli telemetrici nei numeri piccoli
                         
                         progress_bar = st.progress(0)
                         totale_batch = (len(immagini_sospette) // batch_size) + (1 if len(immagini_sospette) % batch_size > 0 else 0)
                         
                         for i in range(0, len(immagini_sospette), batch_size):
                             numero_batch = (i // batch_size) + 1
-                            with st.spinner(f"Fase 2/3: Perizia IA Cloud... (Analisi blocco {numero_batch} di {totale_batch})"):
-                                batch_corrente = immagini_sospette[i:i + batch_size]
+                            with st.spinner(f"Fase 2/3: Scansione Telemetrica e Visiva... (Blocco {numero_batch} di {totale_batch})"):
+                                batch_slice = immagini_sospette[i:i + batch_size]
+                                
+                                # Costruiamo il payload alternando il timestamp reale del video e l'immagine
+                                contenuto_batch = []
+                                for item in batch_slice:
+                                    contenuto_batch.append(f"Frame al minuto {item['timestamp']}:")
+                                    contenuto_batch.append(item["img"])
                                 
                                 prompt_fase1 = f"""{ruolo}
-                                Stai analizzando un frammento di un'ispezione video.
-                                REGOLE TASSATIVE (PENA IL FALLIMENTO DELLA PERIZIA):
-                                1. OCR TELEMETRICO: Estrai la distanza esatta in metri impressa in ogni fotogramma.
-                                2. ZERO RIASSUNTI (DETTAGLIO CLINICO): Segnala OGNI SINGOLA anomalia visibile (fessure, radici, allacci, detriti, livelli d'acqua). Estrai tutto, non accorpare i metri e non omettere nulla.
-                                3. FORMATO OBBLIGATORIO: Ogni anomalia trovata deve iniziare TASSATIVAMENTE con il simbolo "•".
-                                
-                                Usa ESATTAMENTE questo formato per ogni difetto rilevato:
-                                • [Distanza esatta] - [Difetto e Descrizione Clinica]
+                                Analizza questa sequenza ordinata di fotogrammi estratti dal video d'ispezione.
+                                {istruzioni_specifiche_fase1}
+                                REGOLE TASSATIVE:
+                                - Non inventare MAI numeri telemetrici: leggi esattamente i caratteri stampati nell'OSD del video.
+                                - Se un evento (es. Free Span, Giunto, Anodo o Fessura) prosegue su più fotogrammi, riporta la quota di inizio e la quota di fine.
+                                - Ogni riga di output deve iniziare TASSATIVAMENTE con il simbolo "•".
                                 """
                                 
                                 try:
-                                    response = model.generate_content(batch_corrente + [prompt_fase1])
+                                    response = model_flash.generate_content(contenuto_batch + [prompt_fase1])
                                     bozze_parziali.append(response.text)
                                     progress_bar.progress(numero_batch / totale_batch)
-                                    time.sleep(2) # Pausa di respiro per le API
+                                    time.sleep(1.5)
                                 except Exception as e:
                                     st.error(f"⚠️ Errore API Google sul blocco {numero_batch}: {e}")
                                     st.stop()
+                                    
+                        bozza_totale = "\n\n".join(bozze_parziali)
+                                
+                        # --- FASE 3: Consolidamento Eventi, QA e Generazione Referto con Gemini Pro ---        
+                        with st.spinner("Fase 3/3: Consolidamento metrico (Span Merge), Calcolo Strutturale e QA Peritale..."):
+                            try:
+                                prompt_2 = f"""{ruolo}
+                                Agisci come Ingegnere Capo Revisore. Unisci e consolida questi rilievi parziali in un RAPPORTO TECNICO CERTIFICATO definitivo.
+                                
+                                RILIEVI GREZZI DAI BLOCCHI VIDEO:
+                                {bozza_totale}
+                                
+                                REGOLE TASSATIVE DI CONSOLIDAMENTO E FORMATTAZIONE:
+                                1. DIVIETO ASSOLUTO DI PREAMBOLI: Non scrivere introduzioni, saluti o titoli generali. INIZIA DIRETTAMENTE con "SEZIONE 1:".
+                                2. CONSOLIDAMENTO EVENTI CONTINUI (SPAN MERGING): Se lo stesso evento (es. la stessa campata libera, lo stesso giunto marcato "0088" o lo stesso anodo) compare in più righe consecutive a distanza ravvicinata, UNISCILI in una sola voce indicando l'intervallo esatto (es. da KP 1.1014 a KP 1.1031 - Lunghezza: 1.70 m).
+                                3. COERENZA CRONOLOGICA E METRICA: Ordina tutte le voci rigorosamente per progressiva metrica/KP crescente, correggendo eventuali inversioni di lettura OCR.
+                                4. OGNI SINGOLA RIGA della Sezione 1 deve iniziare con il simbolo "• ".
+                                
+                                {istruzioni_specifiche_fase3}
+                                """
+                                
+                                testo_generato = model_pro.generate_content(prompt_2).text
+                                st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
+                                
+                                if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
+                                nuovo_consumo = report_fatti + 1
+                                supabase.table("licenze").update({"report_consumati": nuovo_consumo}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
+                                
+                            except Exception as e:
+                                st.error(f"⚠️ Errore certificazione finale: {e}")
+                                st.stop()
                                     
                         bozza_totale = "\n\n".join(bozze_parziali)
                                 
@@ -1487,120 +933,11 @@ else:
 
                 story = []
                 data_odierna = datetime.now(ZoneInfo("Europe/Rome")).strftime("%d/%m/%Y - %H:%M")
+                standard_pdf = st.session_state.get('standard_usato', "DNV-ST-F101 / DNV-RP-F105" if tipo_ispezione == "Tubazione Sottomarina (ROV)" else "UNI EN 13508-2")
+                
                 table_header = Table([
                     [Paragraph("<b>HYDROAEGIS AI | RAPPORTO TECNICO CERTIFICATO</b>", style_header_title), Paragraph(f"<b>Data Emissione:</b> {data_odierna}", style_meta)],
-                    [Paragraph("<b>Standard di Riferimento:</b> EN 13508-2 | Motore Enterprise", style_header_sub), Paragraph(f"<b>Ambiente:</b> {tipo_ispezione}", style_meta)],
-                    [Paragraph(f"<b>Committente:</b> {cliente_nome}", style_meta), Paragraph("<b>Stato Procedura:</b> Convalidato e Revisionato", style_meta)]
-                ], colWidths=[340, 200])
-                table_header.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")), ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#cbd5e1")), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")), ('PADDING', (0,0), (-1,-1), 6)]))
-                story.append(table_header)
-                story.append(Spacer(1, 10))
-
-                table_hash = Table([[Paragraph("<b>CATENA DI CUSTODIA FORENSE & IMPRONTA DIGITALE DEL FLUSSO VIDEO ORIGINALE</b>", ParagraphStyle('HBoxTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=colors.HexColor("#0f172a")))],
-                                    [Paragraph(f"SHA-256 HASH: {st.session_state.get('file_hash', 'N/D')}", style_hash)]], colWidths=[540])
-                table_hash.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f0f9ff")), ('BOX', (0,0), (-1,-1), 0.8, colors.HexColor("#bae6fd")), ('PADDING', (0,0), (-1,-1), 5)]))
-                story.append(table_hash)
-                story.append(Spacer(1, 12))
-
-                for riga in pulisci_testo_ia(testo_revisionato).split('\n'):
-                    r = riga.strip()
-                    if not r:
-                        story.append(Spacer(1, 4))
-                        continue
-                    if r.isupper() and len(r) > 4: story.append(Paragraph(r, style_section))
-                    elif r.startswith(('1.', '2.', '3.', '4.', '5.', 'SEZIONE', 'FASE')): story.append(Paragraph(f"<b>{r}</b>", style_section))
-                    elif r.startswith(('•', '-')): story.append(Paragraph(f"• {r.lstrip('•- ').strip()}", style_bullet))
-                    else: story.append(Paragraph(r, style_body))
-
-                story.append(Spacer(1, 16))
-                table_legal = Table([[Paragraph("<b>NOTE LEGALI & LIMITAZIONE DI RESPONSABILITÀ (HUMAN-IN-THE-LOOP):</b> Il presente documento è elaborato mediante ausilio di sistemi algoritmici automatici a fini di supporto decisionale. La validazione peritale definitiva, la congruità normativa rispetto agli standard tecnici e la sottoscrizione formale del fascicolo rimangono a totale ed esclusivo carico del tecnico abilitato dell'azienda committente.", style_legal)]], colWidths=[540])
-                table_legal.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")), ('BOX', (0,0), (-1,-1), 0.5, colors.HexColor("#cbd5e1")), ('PADDING', (0,0), (-1,-1), 6)]))
-                story.append(table_legal)
-
-                doc.build(story)
-                with open(pdf_filename, "rb") as pdf_file:
-                    st.download_button("📥 SCARICA IL REPORT PDF CERTIFICATO", data=pdf_file, file_name=pdf_filename, mime="application/pdf")
-
-        # --- ISTRUZIONI E PRIVACY ---
-        st.markdown("""
-        <div class="privacy-box">
-            <h4 style="color: #38bdf8; margin-top: 0;">📌 Istruzioni operative e Garanzia di Privacy</h4>
-            <ol style="margin-bottom: 12px; padding-left: 20px;">
-                <li><b>Seleziona l'ambiente corretto</b> dal menu a tendina.</li>
-                <li><b>Carica il file multimediale</b> dell'ispezione.</li>
-                <li><b>Avvia l'analisi</b> e attendi il completamento del workflow dell'Intelligenza Artificiale. <i>(Il credito viene scalato all'avvio dell'elaborazione).</i></li>
-            </ol>
-            <hr style="border-color: #1e3a8a; margin: 12px 0;">
-            <p style="margin: 0; font-size: 13px; color: #94a3b8;">
-                🛡️ <b>Disclaimer sulla Privacy:</b> I file caricati vengono elaborati temporaneamente per la generazione del report e <b>non vengono conservati o usati per addestrare modelli IA.</b> La proprietà resta interamente del committente.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # --- MODULO DI SUPPORTO COLLEGATO A SUPABASE ---
-        st.markdown("""
-        <div class="support-box">
-            <h4 style="color: #38bdf8; margin-top: 0;">🛠️ Assistenza Tecnica & Supporto Clienti</h4>
-            <p style="font-size: 13px; color: #94a3b8;">Hai riscontrato un problema tecnico o desideri acquistare un pacchetto extra di report? Compila il modulo sottostante: la richiesta arriverà direttamente alla nostra amministrazione e verrai ricontattato entro 48 ore.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        with st.form("form_assistenza_cliente"):
-            tipo_problema = st.selectbox("Seleziona la tipologia di richiesta:", ("Errore nel caricamento del file video", "Problema nella generazione del report PDF", "Richiesta acquisto pacchetto crediti EXTRA", "Disdetta abbonamento (Preavviso 7 giorni)", "Altra segnalazione tecnica"))
-            preferenza_contatto = st.radio("Come preferisci essere ricontattato?", ("Email", "Telefono"))
-            recapito_utente = st.text_input("Inserisci la tua Email o il tuo numero di Telefono:", placeholder="Es. ing.rossi@aziendacliente.it oppure 3331234567")
-            descrizione_problema = st.text_area("Descrivi brevemente la richiesta o il problema riscontrato:")
-            
-            btn_invia_ticket = st.form_submit_button("Invia Richiesta di Assistenza", use_container_width=True)
-
-        if btn_invia_ticket:
-            if recapito_utente and descrizione_problema:
-                try:
-                    supabase.table("ticket_assistenza").insert({"codice_licenza": st.session_state['codice_licenza'], "cliente": cliente_nome, "tipo_problema": tipo_problema, "preferenza_contatto": preferenza_contatto, "recapito": recapito_utente, "descrizione": descrizione_problema, "stato": "Aperto"}).execute()
-                    st.success("✅ Richiesta inviata con successo! Il nostro team tecnico ha preso in carico la segnalazione. Puoi chiudere questa finestra.")
-                except Exception as e:
-                    st.error("⚠️ Errore di connessione. Impossibile inviare la richiesta, riprova più tardi.")
-            else:
-                st.warning("⚠️ Compila tutti i campi (recapito e descrizione) prima di inviare la richiesta.")
-
-# --- FOOTER LEGALE AZIENDALE OBBIGATORIO ---
-st.markdown("""
-    <br><br>
-    <div style="border-top: 1px solid #1e3a8a; padding-top: 20px; text-align: center; color: #64748b; font-size: 12px; margin-top: 50px; margin-bottom: 10px;">
-        <b>HydroAegis AI</b> sviluppato da HydroAegis <br>
-        Sede Legale: Via Campagna 18, 21036 Gemonio (VA) | P.IVA: In fase di attivazione <br>
-        Contatti: info@hydroaegis.it | PEC: hydroaegis@pec.it
-    </div>
-""", unsafe_allow_html=True)
-
-# Layout a colonne per centrare il pulsante nativo di Streamlit
-col_vuota_sx, col_link, col_vuota_dx = st.columns([4, 2, 4])
-with col_link:
-    st.page_link("pages/privacy.py", label="Informativa sulla Privacy", icon="🛡️")
-
-
-        if 'report_text' in st.session_state:
-            st.success("✅ Analisi completata! (Un credito è stato regolarmente scalato dal tuo abbonamento).")
-            testo_revisionato = st.text_area("Bozza Certificata (Modificabile)", value=st.session_state['report_text'], height=400)
-            
-            if st.button("Genera PDF Definitivo con Impronta Forense"):
-                pdf_filename = "Report_Ispezione_Certificato.pdf"
-                doc = SimpleDocTemplate(pdf_filename, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-                styles = getSampleStyleSheet()
-                style_header_title = ParagraphStyle('HeaderTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=14, leading=16, textColor=colors.HexColor("#0f172a"))
-                style_header_sub = ParagraphStyle('HeaderSub', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=11, textColor=colors.HexColor("#475569"))
-                style_meta = ParagraphStyle('MetaText', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, leading=11, textColor=colors.HexColor("#1e293b"))
-                style_hash = ParagraphStyle('HashText', parent=styles['Normal'], fontName='Courier', fontSize=7.5, leading=9, textColor=colors.HexColor("#0284c7"))
-                style_section = ParagraphStyle('SecHeading', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, leading=14, textColor=colors.HexColor("#0f2942"), spaceBefore=10, spaceAfter=4)
-                style_body = ParagraphStyle('Body', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=13, textColor=colors.HexColor("#1e293b"))
-                style_bullet = ParagraphStyle('Bullet', parent=styles['Normal'], fontName='Helvetica', fontSize=9, leading=13, leftIndent=12, firstLineIndent=-10, textColor=colors.HexColor("#1e293b"))
-                style_legal = ParagraphStyle('LegalNotice', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=colors.HexColor("#64748b"))
-
-                story = []
-                data_odierna = datetime.now(ZoneInfo("Europe/Rome")).strftime("%d/%m/%Y - %H:%M")
-                table_header = Table([
-                    [Paragraph("<b>HYDROAEGIS AI | RAPPORTO TECNICO CERTIFICATO</b>", style_header_title), Paragraph(f"<b>Data Emissione:</b> {data_odierna}", style_meta)],
-                    [Paragraph("<b>Standard di Riferimento:</b> EN 13508-2 | Motore Enterprise", style_header_sub), Paragraph(f"<b>Ambiente:</b> {tipo_ispezione}", style_meta)],
+                    [Paragraph(f"<b>Standard di Riferimento:</b> {standard_pdf}", style_header_sub), Paragraph(f"<b>Ambiente:</b> {tipo_ispezione}", style_meta)],
                     [Paragraph(f"<b>Committente:</b> {cliente_nome}", style_meta), Paragraph("<b>Stato Procedura:</b> Convalidato e Revisionato", style_meta)]
                 ], colWidths=[340, 200])
                 table_header.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor("#f8fafc")), ('BOX', (0,0), (-1,-1), 1, colors.HexColor("#cbd5e1")), ('INNERGRID', (0,0), (-1,-1), 0.5, colors.HexColor("#e2e8f0")), ('PADDING', (0,0), (-1,-1), 6)]))
