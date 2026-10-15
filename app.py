@@ -757,20 +757,27 @@ else:
                                • [KP esatto e Metri] | [DEPTH e DOL letti a video] | [CODICE EVENTO OFFSHORE] | [Posizione Oraria] | [Confidenza: ALTA/MEDIA/BASSA] - [Descrizione tecnica]
                             """
                             istruzioni_specifiche_fase3 = """
-                            STRUTTURA OBBLIGATORIA DEL RAPPORTO OFFSHORE (STANDARD DNV):
-                            VIETATO USARE LA PAROLA 'POZZETTO' (usa 'Punto Chilometrico KP'). VIETATO USARE CODICI EN 13508-2 (BAA, BAC, BDA, ecc.).
-                            
-                            SEZIONE 1: RILEVAZIONE ANOMALIE E REGISTRO EVENTI (SURVEY LOG)
-                            Tratta sottomarina ispezionata: da KP [Inizio] a KP [Fine] (Quota batimetrica media: [X] m).
-                            (Accorpa i frame consecutivi dello stesso evento in un unico intervallo KP Inizio - KP Fine calcolando la lunghezza in metri L = X.XX m).
-                            Ogni riga deve iniziare con "• " ed avere questo formato esatto:
-                            • [KP Inizio - KP Fine (Lunghezza m)] | [DOL: X.XX m] | [CODICE EVENTO DNV] | [Ore XX] | [Confidenza: XX%] - [Descrizione peritale. Se Confidenza < 75% per torbidità, aggiungi: [REVISIONE MANUALE CONSIGLIATA - VISIBILITÀ DEGRADATA]]
+                            STRUTTURA OBBLIGATORIA (STANDARD DNV):
+                        VIETATO USARE LA PAROLA 'POZZETTO' E VIETATI I CODICI EN 13508-2.
+                        
+                        REGOLE MATEMATICHE E FISICHE TASSATIVE:
+                        1. CALCOLO METRI DA KP: 1 KP equivale esattamente a 1000 metri. Quindi Lunghezza (m) = (KP_Fine - KP_Inizio) * 1000. 
+                           Esempio: da KP 1.1011 a KP 1.1040 = (1.1040 - 1.1011) * 1000 = 2.90 m (NON 29.00 m!). Verifica ogni singola sottrazione!
+                        2. EVENTI PUNTUALI vs CONTINUI: 
+                           - [FIELD JOINT], [ANODE] e singola [BIOFOULING / FAUNA] sono EVENTI PUNTUALI: indica UN SOLO KP centrale (es. "• KP 1.1022 | DOL: -0.50 m | [FIELD JOINT]...") SENZA intervallo e SENZA Lunghezza.
+                           - [FREE SPAN], [BURIAL / SCOUR], [COATING / CWC] e [TURBIDITY] sono EVENTI CONTINUI: indica l'intervallo KP Inizio - KP Fine e la Lunghezza esatta in metri.
+                        3. SEQUENZA STENCIL: I giunti sono numerati in sequenza (es. 0088, 0089, 0090, 0091, 0092, 0093, 0094, 0095, 0096). Correggi eventuali errori ottici isolati (es. "1093" -> "0093") ed elimina duplicati dello stesso giunto.
 
-                            SEZIONE 2: CLASSIFICAZIONE SEVERITÀ E INTEGRITÀ (PIPELINE INTEGRITY RATING)
-                            (Paragrafo tecnico che classifica gli eventi in Classe di Severità 1-Trascurabile, 2-Monitoraggio Ordinario, 3-Attenzione Tecnica/Calcolo Fatica, valutando rivestimento CWC, consumo anodi a bracciale e campate libere).
+                        SEZIONE 1: RILEVAZIONE ANOMALIE E REGISTRO EVENTI (SURVEY LOG)
+                        Tratta sottomarina ispezionata: da KP [Inizio] a KP [Fine] (Sviluppo totale: [X.XX] m - Quota batimetrica media: [X] m).
+                        Ogni riga inizia OBBLIGATORIAMENTE con "• " seguito da spazio:
+                        • KP [Valore o Intervallo] | DOL: [X.XX] m | [EVENTO DNV] | Ore [XX] | Confidenza: [XX]% - [Descrizione. Se visibilità < 75% per torbidità aggiungi: [REVISIONE MANUALE CONSIGLIATA - VISIBILITÀ DEGRADATA]]
 
-                            SEZIONE 3: VALUTAZIONE STRUTTURALE E SCREENING VIV (DNV-RP-F105)
-                            (Analisi ingegneristica delle lunghezze di Free Span rilevate rispetto alle soglie critiche per Vortex-Induced Vibrations - VIV, stabilità geotecnica, protezione catodica e prescrizioni operative per il committente).
+                        SEZIONE 2: CLASSIFICAZIONE SEVERITÀ E INTEGRITÀ (PIPELINE INTEGRITY RATING)
+                        (Paragrafo su rating severità 1-3, consumo anodi a bracciale, integrità CWC e campate libere con lunghezze reali corrette).
+
+                        SEZIONE 3: VALUTAZIONE STRUTTURALE E SCREENING VIV (DNV-RP-F105)
+                        (Analisi statica, stima risonanza Vortex-Induced Vibrations in base alle lunghezze reali delle campate libere, protezione catodica e prescrizioni).
                             """
                         else:
                             standard_normativo = "UNI EN 13508-2 (Sistemi di fognature e scarico)"
