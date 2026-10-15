@@ -900,7 +900,7 @@ else:
                                 (Analisi statica e azioni correttive).
                                 """
                                 
-                                testo_generato = model.generate_content(prompt_2).text
+                                testo_generato = model_pro.generate_content(prompt_2).text
                                 st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
                                 
                                 if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
