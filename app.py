@@ -1,5 +1,3 @@
-Codice funzionante prima delle modifiche del 15 ottobre 2026
-
 import streamlit as st
 import cv2
 from PIL import Image
