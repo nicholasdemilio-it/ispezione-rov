@@ -735,16 +735,16 @@ else:
                             except Exception:
                                 pass # Se il check fallisce per rete, procede comunque
 
-                        # --- IMPOSTAZIONE REGOLE PER AMBIENTE ---
+                        # --- IMPOSTAZIONE REGOLE PER AMBIENTE (OFFSHORE DNV vs FOGNATURA EN 13508-2) ---
                         if tipo_ispezione == "Tubazione Sottomarina (ROV)":
                             standard_normativo = "DNV-ST-F101 / DNV-RP-F105 (Submarine Pipeline Systems)"
                             ruolo = "Sei un Senior Subsea Pipeline Inspector certificato secondo gli standard offshore DNV-ST-F101, DNV-RP-F105 e IMCA."
                             istruzioni_specifiche_fase1 = """
-                            STAI ANALIZZANDO L'ESTerno DI UNA CONDOTTA SOTTOMARINA TRAMITE ROV.
+                            STAI ANALIZZANDO L'ESTERNO DI UNA CONDOTTA SOTTOMARINA TRAMITE ROV.
                             1. OCR TELEMETRICO OSD (OBBLIGATORIO): Leggi con precisione chirurgica i dati sovraimpressi nel video:
-                               - KP (Kilometer Post, es. KP 1.0994 -> converti anche in metri 1099.40 m)
+                               - KP (Kilometer Post, es. KP 1.0994)
                                - DEPTH (Profondità batimetrica in metri, es. 92.9 m)
-                               - DOL (Depth of Lowering / grado di interro, es. DOL -0.14 o +0.45)
+                               - DOL (Depth of Lowering / grado di interro, es. DOL -0.14 m o +0.45 m)
                             2. CODICI EVENTO OFFSHORE AMMESSI (VIETATO USARE CODICI EN 13508-2 COME BAA/BDA/BAC):
                                - [FREE SPAN]: Campata libera / tubo sospeso con luce passante sotto la generatrice inferiore (ore 06). Indica inizio, fine e touchdown point.
                                - [FIELD JOINT]: Giunto saldato di campo / manicotto termoretraibile / marcatura numerica stencilata (es. "0088", "0089", "0094").
@@ -754,63 +754,81 @@ else:
                                - [BIOFOULING / FAUNA]: Incrostazioni marine, organismi sessili o fauna bentonica.
                                - [TURBIDITY]: Nube di limo/fango sollevata dai propulsori ROV che riduce la visibilità.
                             3. FORMATO RIGA OBBLIGATORIO:
-                               • [KP esatto e Metri] | [DEPTH e DOL letti a video] | [CODICE EVENTO OFFSHORE] | [Posizione Oraria] | [Confidenza: ALTA/MEDIA/BASSA] - [Descrizione tecnica]
+                               • [KP esatto] | [DEPTH e DOL letti a video] | [CODICE EVENTO OFFSHORE] | [Posizione Oraria] | [Confidenza: ALTA/MEDIA/BASSA] - [Descrizione tecnica]
                             """
                             istruzioni_specifiche_fase3 = """
                             STRUTTURA OBBLIGATORIA (STANDARD DNV):
-                        VIETATO USARE LA PAROLA 'POZZETTO' E VIETATI I CODICI EN 13508-2.
-                        
-                        REGOLE MATEMATICHE E FISICHE TASSATIVE:
-                        1. CALCOLO METRI DA KP: 1 KP equivale esattamente a 1000 metri. Quindi Lunghezza (m) = (KP_Fine - KP_Inizio) * 1000. 
-                           Esempio: da KP 1.1011 a KP 1.1040 = (1.1040 - 1.1011) * 1000 = 2.90 m (NON 29.00 m!). Verifica ogni singola sottrazione!
-                        2. EVENTI PUNTUALI vs CONTINUI: 
-                           - [FIELD JOINT], [ANODE] e singola [BIOFOULING / FAUNA] sono EVENTI PUNTUALI: indica UN SOLO KP centrale (es. "• KP 1.1022 | DOL: -0.50 m | [FIELD JOINT]...") SENZA intervallo e SENZA Lunghezza.
-                           - [FREE SPAN], [BURIAL / SCOUR], [COATING / CWC] e [TURBIDITY] sono EVENTI CONTINUI: indica l'intervallo KP Inizio - KP Fine e la Lunghezza esatta in metri.
-                        3. SEQUENZA STENCIL: I giunti sono numerati in sequenza (es. 0088, 0089, 0090, 0091, 0092, 0093, 0094, 0095, 0096). Correggi eventuali errori ottici isolati (es. "1093" -> "0093") ed elimina duplicati dello stesso giunto.
+                            VIETATO USARE LA PAROLA 'POZZETTO' E VIETATI I CODICI EN 13508-2.
+                            
+                            REGOLE MATEMATICHE E FISICHE TASSATIVE:
+                            1. CALCOLO METRI DA KP: 1 KP equivale esattamente a 1000 metri. Quindi Lunghezza (m) = (KP_Fine - KP_Inizio) * 1000. 
+                               Esempio: da KP 1.1011 a KP 1.1040 = (1.1040 - 1.1011) * 1000 = 2.90 m (NON 29.00 m!). Verifica ogni singola sottrazione!
+                            2. EVENTI PUNTUALI vs CONTINUI: 
+                               - [FIELD JOINT], [ANODE] e singola [BIOFOULING / FAUNA] sono EVENTI PUNTUALI: indica UN SOLO KP centrale (es. "• KP 1.1022 | DOL: -0.50 m | [FIELD JOINT]...") SENZA intervallo e SENZA Lunghezza.
+                               - [FREE SPAN], [BURIAL / SCOUR], [COATING / CWC] e [TURBIDITY] sono EVENTI CONTINUI: unisci i tratti consecutivi dello stesso evento indicando "KP Inizio - KP Fine (Lunghezza: X.XX m)".
+                            3. SEQUENZA STENCIL: I giunti sono numerati in sequenza (es. 0088, 0089, 0090, 0091, 0092, 0093, 0094, 0095, 0096). Correggi eventuali errori ottici isolati (es. "1093" -> "0093") ed elimina duplicati dello stesso giunto.
 
-                        SEZIONE 1: RILEVAZIONE ANOMALIE E REGISTRO EVENTI (SURVEY LOG)
-                        Tratta sottomarina ispezionata: da KP [Inizio] a KP [Fine] (Sviluppo totale: [X.XX] m - Quota batimetrica media: [X] m).
-                        Ogni riga inizia OBBLIGATORIAMENTE con "• " seguito da spazio:
-                        • KP [Valore o Intervallo] | DOL: [X.XX] m | [EVENTO DNV] | Ore [XX] | Confidenza: [XX]% - [Descrizione. Se visibilità < 75% per torbidità aggiungi: [REVISIONE MANUALE CONSIGLIATA - VISIBILITÀ DEGRADATA]]
+                            SEZIONE 1: RILEVAZIONE ANOMALIE E REGISTRO EVENTI (SURVEY LOG)
+                            Tratta sottomarina ispezionata: da KP [Inizio] a KP [Fine] (Sviluppo totale: [X.XX] m - Quota batimetrica media: [X] m).
+                            Ogni riga inizia OBBLIGATORIAMENTE con "• " seguito da spazio:
+                            • KP [Valore oppure Inizio - Fine (Lunghezza: X.XX m)] | DOL: [X.XX] m | [EVENTO DNV] | Ore [XX] | Confidenza: [XX]% - [Descrizione. Se visibilità < 75% per torbidità aggiungi: [REVISIONE MANUALE CONSIGLIATA - VISIBILITÀ DEGRADATA]]
 
-                        SEZIONE 2: CLASSIFICAZIONE SEVERITÀ E INTEGRITÀ (PIPELINE INTEGRITY RATING)
-                        (Paragrafo su rating severità 1-3, consumo anodi a bracciale, integrità CWC e campate libere con lunghezze reali corrette).
+                            SEZIONE 2: CLASSIFICAZIONE SEVERITÀ E INTEGRITÀ (PIPELINE INTEGRITY RATING)
+                            (Paragrafo strutturato in Classe 1, Classe 2 e Classe 3 su consumo anodi a bracciale, integrità CWC e campate libere con le lunghezze reali corrette in metri).
 
-                        SEZIONE 3: VALUTAZIONE STRUTTURALE E SCREENING VIV (DNV-RP-F105)
-                        (Analisi statica, stima risonanza Vortex-Induced Vibrations in base alle lunghezze reali delle campate libere, protezione catodica e prescrizioni).
+                            SEZIONE 3: VALUTAZIONE STRUTTURALE E SCREENING VIV (DNV-RP-F105)
+                            (Analisi statica, stima risonanza Vortex-Induced Vibrations in base alle lunghezze reali delle campate libere, protezione catodica e prescrizioni).
                             """
                         else:
-                            standard_normativo = "UNI EN 13508-2 (Sistemi di fognature e scarico)"
-                            ruolo = "Sei un Ingegnere Civile Idraulico e Ispettore certificato UNI EN 13508-2."
+                            standard_normativo = "UNI EN 13508-2 (Condizioni degli scarichi e delle fognature all'esterno degli edifici)"
+                            ruolo = "Sei un Ingegnere Civile Idraulico e Ispettore Fognario Senior certificato UNI EN 13508-2."
                             istruzioni_specifiche_fase1 = """
-                            STAI ANALIZZANDO L'INTERNO DI UNA CONDOTTA FOGNARIA CIVILE/STRADALE.
-                            1. OCR TELEMETRICO OSD: Leggi la progressiva metrica esatta impressa a schermo (es. 14.50 m).
-                            2. DIZIONARIO RIGIDO CODICI UNI EN 13508-2 (USA SOLO QUESTI CODICI CORRISPONDENTI):
-                               - BAA A: Fessurazione/Frattura longitudinale | BAA B: Frattura circonferenziale | BAA C: Frattura complessa/a ragnatela
-                               - BAB: Deformazione flessibile/ovalizzazione della sezione
-                               - BAC: Collasso / Crollo parziale o totale della parete con terreno a vista
-                               - BAF: Difetto del giunto (disassamento, sfilamento, guarnizione sporgente/visibile)
-                               - BBA: Depositi sedimentari sul fondo (sabbia, ghiaia, incrostazioni calcaree) con % di riduzione sezione
-                               - BBB: Intrusione di radici (a ciuffo o a massa compatta)
-                               - BBC: Ostruzioni / Corpi estranei puntuali
-                               - BDA: Allacciamento laterale (conforme, sporgente/intrusivo o difettoso)
-                               - BDC: Perdita di visibilità / Telecamera sommersa da battente idrico o fango
-                            3. FORMATO RIGA OBBLIGATORIO:
-                               • [Metratura esatta m] | [Codice EN 13508-2] | [Posizione Oraria es. Ore 12 o Ore 04-08] | [Confidenza: ALTA/MEDIA/BASSA] - [Descrizione clinica e % riduzione sezione]
+                            STAI ANALIZZANDO UNA VIDEOISPEZIONE CCTV ALL'INTERNO DI UN COLLETTORE FOGNARIO CIVILE.
+                            1. TELEMETRIA OSD: Leggi con precisione assoluta la progressiva metrica impressa a video (in metri, es. 12.45 m), i codici pozzetto/nodo e l'inclinazione.
+                            2. IDENTIFICAZIONE MANUFATTO: Riconosci nei primi frame il materiale della tubazione (Calcestruzzo/CLS, PVC, Gres, PEAD, Muratura) e la forma della sezione (Circolare, Ovoidale).
+                            3. DIZIONARIO RIGIDO UNI EN 13508-2 (Usa codici + caratterizzatori):
+                               DIFETTI STRUTTURALI:
+                               - [BAA A / BAA B / BAA C]: Fessura/Frattura (A = Incrinatura chiusa, B = Frattura aperta, C = Frattura multipla/complessa) + orientamento.
+                               - [BAB]: Deformazione / Ovalizzazione della sezione (indica % stimata di schiacciamento).
+                               - [BAC]: Collasso / Crollo strutturale della parete o perdita di porzioni di tubo con terreno esposto.
+                               - [BAF A / BAF B / BAF C]: Difetto di giunzione (A = Giunto sfilato longitudinalmente, B = Giunto disassato radialmente/scalino, C = Guarnizione elastomerica sfilata/visibile).
+                               - [BAJ]: Superficie degradata / Corrosione da H2S / Aggregato o armatura esposta (per tubi in CLS).
+                               DIFETTI FUNZIONALI E IDRAULICI:
+                               - [BBA A / BBA C]: Depositi aderenti o sedimentati (A = Incrostazioni calcaree dure, C = Sabbia/Limo/Ghiaia sul fondo) + % riduzione sezione idraulica.
+                               - [BBB]: Intrusione di apparati radicali (radici fini o radici a massa dai giunti/allacci) + % riduzione sezione.
+                               - [BBC]: Ostacoli puntuali / Detriti / Corpi estranei intrusi.
+                               - [BBF A / BBF B / BBF C]: Infiltrazione di acqua di falda dall'esterno (A = Trasudamento, B = Gocciolamento, C = Getto continuo).
+                               ELEMENTI COSTRUTTIVI E ISPEZIONE:
+                               - [BDA]: Allacciamento laterale (specifica se conforme a filo parete, intruso/sporgente o danneggiato).
+                               - [BCD]: Nodo / Pozzetto di partenza o arrivo.
+                               - [BDC]: Telecamera sommersa / Avvallamento contropendenza (sags) / Visibilità azzerata da vapore o torbidità.
+                            4. FORMATO RIGA OBBLIGATORIO:
+                               • [Metri X.XX m] | [Codice EN 13508-2] | [Ore XX:00] | [Confidenza: ALTA/MEDIA/BASSA] - [Descrizione tecnica e % riduzione diametro]
                             """
                             istruzioni_specifiche_fase3 = """
-                            STRUTTURA OBBLIGATORIA DEL RAPPORTO FOGNARIO (NORMA UNI EN 13508-2):
+                            STRUTTURA OBBLIGATORIA DEL RAPPORTO PERITALE FOGNARIO (NORMA UNI EN 13508-2):
                             
-                            SEZIONE 1: RILEVAZIONE ANOMALIE (CODIFICA UNI EN 13508-2)
-                            Tratta ispezionata: dal Pozzetto [Nodo Monte] al Pozzetto [Nodo Valle] (Lunghezza totale: [X] m).
-                            Ogni riga deve iniziare con "• " ed avere questo formato esatto:
-                            • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] | [Confidenza: XX%] - [Descrizione peritale con stima % riduzione diametro. Se visibilità scarsa aggiungi: [REVISIONE MANUALE CONSIGLIATA]]
+                            REGOLE MATEMATICHE E FISICHE TASSATIVE:
+                            1. EVENTI PUNTUALI vs CONTINUI:
+                               - [BDA] (Allacciamento), [BAF] (Giunto difettoso), [BBC] (Ostacolo isolato) e [BCD] (Pozzetto) sono EVENTI PUNTUALI: indica UNA SOLA progressiva metrica secca (es. "• 14.30 m | [BDA]...").
+                               - [BBA] (Depositi sul fondo), [BAJ] (Corrosione parete), [BAA] (Fessura longitudinale estesa) e [BDC] (Tratto sommerso/avvallamento) sono EVENTI CONTINUI: accorpa i frame consecutivi indicando "da X.XX m a Y.YY m (Lunghezza: Z.ZZ m)" dove Z.ZZ = Y.YY - X.XX.
+                            2. Verifica l'esattezza matematica di ogni sottrazione metrica e ordina rigorosamente dalla progressiva 0.00 m fino a fine tratta.
 
-                            SEZIONE 2: CLASSIFICAZIONE IQI (INDICE DI QUALITÀ E PRIORITÀ D'INTERVENTO)
-                            (Paragrafo tecnico discorsivo sull'Indice di Priorità strutturale e funzionale da 1 a 5 secondo EN 13508-2).
+                            SEZIONE 1: RILEVAZIONE ANOMALIE E REGISTRO TELEVISIVO (CODIFICA UNI EN 13508-2)
+                            Scheda Tecnica Tratta: da Nodo/Pozzetto [Monte] a Nodo/Pozzetto [Valle] | Sviluppo ispezionato: [X.XX] m | Materiale rilevato: [Materiale] | Sezione: [Forma].
+                            Ogni riga deve iniziare OBBLIGATORIAMENTE con "• " seguito da spazio:
+                            • [Metri X.XX m oppure da X.XX m a Y.YY m (Lunghezza: Z.ZZ m)] | [Codice EN 13508-2] | Ore [XX:00] | Confidenza: [XX]% - [Descrizione tecnica, apertura fessura in mm o % riduzione sezione idraulica. Se visibilità < 75% aggiungi: [REVISIONE MANUALE CONSIGLIATA - VISIBILITÀ DEGRADATA]]
 
-                            SEZIONE 3: VALUTAZIONE STRUTTURALE E PIANO DI RISANAMENTO
-                            (Analisi statica, tenuta idraulica e prescrizioni di intervento: lavaggio canal-jet, fresatura robotizzata, relining CIPP o scavo puntuale).
+                            SEZIONE 2: CLASSIFICAZIONE DI GRAVITÀ E INDICE IQI (STATO STRUTTURALE vs FUNZIONALE)
+                            Suddividi l'analisi in due paragrafi distinti:
+                            - Stato Strutturale (Classi di gravità da 1 a 5): valutazione di fessurazioni (BAA), giunti disassati (BAF), deformazioni (BAB), corrosione (BAJ) o crolli (BAC).
+                            - Stato Funzionale e Idraulico: valutazione della perdita di officiosità idraulica causata da sedimenti (BBA), radici (BBB), allacci intrusi (BDA), infiltrazioni parassite (BBF) o contropendenze/ristagni (BDC).
+
+                            SEZIONE 3: PIANO DI MANUTENZIONE E RISANAMENTO (TRENCHLESS / NO-DIG vs SCAVO)
+                            Prescrizioni operative mirate sulle progressive esatte rilevate nella Sezione 1:
+                            1. Interventi Preliminari: Lavaggio idrodinamico ad alta pressione (Canal-Jet) per rimozione depositi [BBA] e fresatura robotica per radici [BBB] o allacci sporgenti [BDA].
+                            2. Risanamento Non Distruttivo (No-Dig / Trenchless): dove applicabile, indica posizionamento di Packer puntuali (Part-Lining) sui giunti/fessure isolate o calza continua termoindurente (Relining CIPP - UNI EN ISO 11296-4).
+                            3. Ripristino a Cielo Aperto: prescrivi scavo tradizionale solo in caso di collasso strutturale [BAC] o deformazione severa > 15%.
                             """
 
                         st.session_state['standard_usato'] = standard_normativo
@@ -827,7 +845,6 @@ else:
                             with st.spinner(f"Fase 2/3: Scansione Telemetrica e Visiva... (Blocco {numero_batch} di {totale_batch})"):
                                 batch_slice = immagini_sospette[i:i + batch_size]
                                 
-                                # Costruiamo il payload alternando il timestamp reale del video e l'immagine
                                 contenuto_batch = []
                                 for item in batch_slice:
                                     contenuto_batch.append(f"Frame al minuto {item['timestamp']}:")
@@ -838,7 +855,7 @@ else:
                                 {istruzioni_specifiche_fase1}
                                 REGOLE TASSATIVE:
                                 - Non inventare MAI numeri telemetrici: leggi esattamente i caratteri stampati nell'OSD del video.
-                                - Se un evento (es. Free Span, Giunto, Anodo o Fessura) prosegue su più fotogrammi, riporta la quota di inizio e la quota di fine.
+                                - Se un evento continuo prosegue su più fotogrammi, riporta la quota di inizio e la quota di fine.
                                 - Ogni riga di output deve iniziare TASSATIVAMENTE con il simbolo "•".
                                 """
                                 
@@ -853,8 +870,8 @@ else:
                                     
                         bozza_totale = "\n\n".join(bozze_parziali)
                                 
-                        # --- FASE 3: Consolidamento Eventi, QA e Generazione Referto con Gemini Pro ---        
-                        with st.spinner("Fase 3/3: Consolidamento metrico (Span Merge), Calcolo Strutturale e QA Peritale..."):
+                        # --- FASE 3 (UNICA!): Consolidamento Eventi, QA e Generazione Referto con Gemini Pro ---        
+                        with st.spinner("Fase 3/3: Consolidamento metrico, Calcolo Strutturale e QA Peritale..."):
                             try:
                                 prompt_2 = f"""{ruolo}
                                 Agisci come Ingegnere Capo Revisore. Unisci e consolida questi rilievi parziali in un RAPPORTO TECNICO CERTIFICATO definitivo.
@@ -864,8 +881,8 @@ else:
                                 
                                 REGOLE TASSATIVE DI CONSOLIDAMENTO E FORMATTAZIONE:
                                 1. DIVIETO ASSOLUTO DI PREAMBOLI: Non scrivere introduzioni, saluti o titoli generali. INIZIA DIRETTAMENTE con "SEZIONE 1:".
-                                2. CONSOLIDAMENTO EVENTI CONTINUI (SPAN MERGING): Se lo stesso evento (es. la stessa campata libera, lo stesso giunto marcato "0088" o lo stesso anodo) compare in più righe consecutive a distanza ravvicinata, UNISCILI in una sola voce indicando l'intervallo esatto (es. da KP 1.1014 a KP 1.1031 - Lunghezza: 1.70 m).
-                                3. COERENZA CRONOLOGICA E METRICA: Ordina tutte le voci rigorosamente per progressiva metrica/KP crescente, correggendo eventuali inversioni di lettura OCR.
+                                2. CONSOLIDAMENTO EVENTI: Unisci i tratti consecutivi dello stesso evento continuo indicando l'intervallo esatto e la lunghezza reale in metri; riporta invece gli eventi puntuali con una sola quota secca.
+                                3. COERENZA CRONOLOGICA E METRICA: Ordina tutte le voci rigorosamente per progressiva metrica/KP crescente, correggendo eventuali refusi ottici.
                                 4. OGNI SINGOLA RIGA della Sezione 1 deve iniziare con il simbolo "• ".
                                 
                                 {istruzioni_specifiche_fase3}
@@ -882,43 +899,6 @@ else:
                                 st.error(f"⚠️ Errore certificazione finale: {e}")
                                 st.stop()
                                     
-                        bozza_totale = "\n\n".join(bozze_parziali)
-                                
-                        # --- FASE 3: QA e Generazione Referto ---        
-                        with st.spinner("Fase 3/3: Applicazione QA, Calcolo IQI e Revisione Ortografica Peritale..."):
-                            try:
-                                prompt_2 = f"""Sei un Ingegnere Capo. Unisci questi appunti parziali in un RAPPORTO TECNICO.
-                                {bozza_totale}
-                                
-                                REGOLE TASSATIVE DI FORMATTAZIONE:
-                                1. DIVIETO ASSOLUTO DI PREAMBOLI: NON scrivere titoli generali, non inserire date, non inserire formule di conversione (es. ft=m).
-                                2. INIZIA DIRETTAMENTE con le parole "SEZIONE 1: RILEVAZIONE ANOMALIE".
-                                3. FORMATO ELENCO OBBLIGATORIO: Ogni singola riga delle anomalie deve iniziare con il simbolo "• ". Non dimenticarlo mai.
-                                
-                                STRUTTURA OBBLIGATORIA:
-                                SEZIONE 1: RILEVAZIONE ANOMALIE
-                                Tratta ispezionata: dal Pozzetto [Nodo] al Pozzetto [Nodo].
-                                • [Distanza m] | [Codice EN 13508-2] | [Posizione Orologio] - [Descrizione]
-
-                                SEZIONE 2: CLASSIFICAZIONE IQI
-                                (Paragrafo tecnico discorsivo sull'Indice di Priorità da 1 a 5).
-
-                                SEZIONE 3: VALUTAZIONE STRUTTURALE
-                                (Analisi statica e azioni correttive).
-                                """
-                                
-                                testo_generato = model_pro.generate_content(prompt_2).text
-                                st.session_state['report_text'] = pulisci_testo_ia(testo_generato)
-                                
-                                if os.path.exists(tmp_file_path): os.remove(tmp_file_path)
-                                    # Scala il credito effettivo su Supabase
-                                nuovo_consumo = report_fatti + 1
-                                supabase.table("licenze").update({"report_consumati": nuovo_consumo}).eq("codice_licenza", st.session_state['codice_licenza']).execute()
-                                
-                            except Exception as e:
-                                st.error(f"⚠️ Errore certificazione finale: {e}")
-                                st.stop()
-
         if 'report_text' in st.session_state:
             st.success("✅ Analisi completata! (Un credito è stato regolarmente scalato dal tuo abbonamento).")
             testo_revisionato = st.text_area("Bozza Certificata (Modificabile)", value=st.session_state['report_text'], height=400)
